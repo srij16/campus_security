@@ -33,8 +33,8 @@ export const LandingPage: React.FC = () => {
     <div className="space-y-24 pb-12">
       {/* 1. HERO SECTION */}
       <section className="relative pt-12 sm:pt-20 pb-16 overflow-hidden">
-        {/* Glow Spheres */}
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-gradient-to-tr from-cyan-500/20 via-sky-600/15 to-indigo-600/20 blur-[130px] rounded-full pointer-events-none" />
+        {/* Technical mesh background grid */}
+        <div className="hero-grid" />
 
         <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center relative z-10 space-y-6">
           {/* AI Banner Pill */}
@@ -44,7 +44,7 @@ export const LandingPage: React.FC = () => {
           </div>
 
           {/* Main Title & Subtitle from PDF */}
-          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-white leading-[1.1]">
+          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold hero-title text-white leading-[1.1]">
             Campus Guardian
           </h1>
 
@@ -60,7 +60,7 @@ export const LandingPage: React.FC = () => {
           <div className="flex flex-wrap items-center justify-center gap-3.5 pt-4">
             <button
               onClick={() => setActiveTab('report')}
-              className="px-6 py-3.5 rounded-xl font-bold text-sm bg-gradient-to-r from-cyan-400 to-sky-500 text-black hover:from-cyan-300 hover:to-sky-400 shadow-[0_0_25px_rgba(56,189,248,0.4)] flex items-center gap-2 transition-all hover:scale-[1.02] active:scale-98"
+              className="px-6 py-3.5 rounded-xl font-extrabold text-sm bg-cyan-400 text-black border-2 border-black shadow-[4px_4px_0px_#fff] hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[6px_6px_0px_#fff] transition-all flex items-center gap-2"
             >
               <Camera className="w-4 h-4 stroke-[2.5]" />
               <span>Report Issue</span>
@@ -350,8 +350,8 @@ export const LandingPage: React.FC = () => {
 
       {/* 6. BOTTOM CALL TO ACTION */}
       <section className="max-w-5xl mx-auto px-4 sm:px-6">
-        <div className="rounded-3xl p-8 sm:p-12 bg-gradient-to-r from-cyan-950/60 via-[#0f1d38] to-slate-900 border border-cyan-500/40 text-center space-y-6 shadow-2xl relative overflow-hidden">
-          <div className="absolute -right-20 -bottom-20 w-60 h-60 bg-cyan-500/10 blur-3xl rounded-full" />
+        <div className="rounded-3xl p-8 sm:p-12 bg-slate-900 border-2 border-cyan-400 text-center space-y-6 shadow-[6px_6px_0px_#22d3ee] hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[8px_8px_0px_#22d3ee] transition-all duration-300 relative overflow-hidden">
+          {/* Removed glow container for brutalist theme */}
           <h2 className="text-2xl sm:text-4xl font-extrabold text-white">
             Experience Smarter Campus Living Today
           </h2>
@@ -361,14 +361,14 @@ export const LandingPage: React.FC = () => {
           <div className="flex flex-wrap justify-center gap-4 pt-2">
             <button
               onClick={() => setActiveTab('report')}
-              className="px-7 py-3.5 rounded-xl font-bold text-sm bg-cyan-400 text-black hover:bg-cyan-300 shadow-[0_0_25px_rgba(56,189,248,0.4)] flex items-center gap-2 transition-all"
+              className="px-7 py-3.5 rounded-xl font-bold text-sm bg-cyan-400 text-black hover:bg-cyan-300 border-2 border-black shadow-[3px_3px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_#000] flex items-center gap-2 transition-all duration-200"
             >
               <Camera className="w-4 h-4 stroke-[2.5]" />
               <span>Launch AI Issue Reporter</span>
             </button>
             <button
               onClick={() => setActiveTab('login')}
-              className="px-7 py-3.5 rounded-xl font-bold text-sm bg-slate-900 border border-slate-700 hover:bg-slate-800 text-white transition-all"
+              className="px-7 py-3.5 rounded-xl font-bold text-sm bg-slate-900 border-2 border-slate-700 hover:border-slate-500 hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_#fff] text-white transition-all duration-200"
             >
               Login with Campus ID
             </button>

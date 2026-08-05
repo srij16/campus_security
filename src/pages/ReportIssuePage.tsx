@@ -245,7 +245,7 @@ export const ReportIssuePage: React.FC = () => {
                   {/* AI Scanning Beam Overlay */}
                   {isScanning && (
                     <div className="absolute inset-0 bg-cyan-950/40 backdrop-blur-[2px] flex flex-col items-center justify-center">
-                      <div className="w-full h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent absolute scanner-beam shadow-[0_0_15px_#00f2fe]" />
+                      <div className="w-full h-1 bg-cyan-400 absolute scanner-beam" />
                       <div className="p-3 rounded-2xl bg-black/80 border border-cyan-500/50 flex items-center gap-2 text-cyan-300 text-xs font-bold shadow-2xl">
                         <RefreshCw className="w-4 h-4 animate-spin text-cyan-400" />
                         <span>AI Vision Scanning Pixels...</span>
@@ -331,7 +331,7 @@ export const ReportIssuePage: React.FC = () => {
         {/* Right Column: AI Auto-Classification & Form Fields (7 cols) */}
         <div className="lg:col-span-7 space-y-6">
           {/* AI Auto-Classified Badges Summary Card */}
-          <div className="p-5 rounded-3xl bg-gradient-to-br from-cyan-950/40 via-slate-900 to-indigo-950/30 border border-cyan-500/30 shadow-[0_0_30px_-10px_rgba(56,189,248,0.2)] space-y-4">
+          <div className="p-5 rounded-3xl bg-slate-900 border-2 border-slate-700 shadow-[4px_4px_0px_#38bdf8] space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-300">
@@ -515,7 +515,7 @@ export const ReportIssuePage: React.FC = () => {
               <button
                 type="submit"
                 disabled={isScanning}
-                className="w-full py-3.5 rounded-2xl font-bold text-xs sm:text-sm bg-gradient-to-r from-cyan-400 via-sky-400 to-indigo-400 text-black hover:opacity-95 shadow-[0_0_25px_rgba(56,189,248,0.4)] flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                className="w-full py-3.5 rounded-2xl font-bold text-xs sm:text-sm bg-purple-400 text-black border-2 border-black shadow-[3px_3px_0px_#000] hover:bg-purple-300 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
               >
                 <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
                 <span>Submit Ticket & Dispatch to {department}</span>

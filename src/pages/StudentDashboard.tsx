@@ -80,7 +80,7 @@ export const StudentDashboard: React.FC = () => {
         <div className="flex flex-wrap gap-3 relative z-10 w-full sm:w-auto">
           <button
             onClick={() => setActiveTab('report')}
-            className="flex-1 sm:flex-none px-6 py-3.5 rounded-2xl font-bold text-xs sm:text-sm bg-gradient-to-r from-cyan-400 to-sky-500 text-black hover:from-cyan-300 hover:to-sky-400 shadow-[0_0_20px_rgba(56,189,248,0.35)] flex items-center justify-center gap-2 transition-all"
+            className="flex-1 sm:flex-none px-6 py-3.5 rounded-2xl font-bold text-xs sm:text-sm bg-cyan-400 text-black border-2 border-black shadow-[3px_3px_0px_#000] hover:bg-cyan-300 flex items-center justify-center gap-2 transition-all"
           >
             <PlusCircle className="w-4 h-4 stroke-[2.5]" />
             <span>Report New Issue</span>

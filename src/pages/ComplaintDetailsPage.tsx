@@ -160,7 +160,7 @@ export const ComplaintDetailsPage: React.FC = () => {
           {/* Progress Connecting Line */}
           <div className="absolute top-7 left-6 right-6 h-1 bg-slate-800 rounded-full z-0 hidden sm:block">
             <div 
-              className="h-full bg-gradient-to-r from-cyan-400 to-emerald-400 rounded-full transition-all duration-500"
+              className="h-full bg-cyan-400 rounded-full transition-all duration-500"
               style={{ width: `${(currentStepIdx / 3) * 100}%` }}
             />
           </div>
@@ -262,7 +262,7 @@ export const ComplaintDetailsPage: React.FC = () => {
           </div>
 
           {/* AI Analysis Card */}
-          <div className="p-5 rounded-3xl bg-gradient-to-br from-cyan-950/30 via-slate-900 to-indigo-950/20 border border-cyan-500/30 space-y-3">
+          <div className="p-5 rounded-3xl bg-slate-900 border-2 border-slate-700 shadow-[4px_4px_0px_#38bdf8] space-y-3">
             <div className="flex items-center gap-2 text-cyan-300 font-bold text-xs uppercase tracking-wider">
               <Sparkles className="w-4 h-4 text-cyan-400" />
               <span>Standard AI Assessment Protocol</span>

@@ -12,10 +12,8 @@ export const Footer: React.FC = () => {
           {/* Brand */}
           <div className="space-y-3 md:col-span-1">
             <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-xl bg-gradient-to-tr from-cyan-500 to-sky-400 text-black">
-                <ShieldCheck className="w-5 h-5 stroke-[2.5]" />
-              </div>
-              <span className="font-extrabold text-base text-white tracking-tight">
+              <img src="/logo.png" alt="Campus Guardian Logo" className="w-6 h-6 object-contain rounded" />
+              <span className="font-head font-black text-base text-white tracking-tighter uppercase">
                 Campus <span className="text-cyan-400">Guardian</span>
               </span>
             </div>

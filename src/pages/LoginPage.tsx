@@ -225,7 +225,7 @@ export const LoginPage: React.FC = () => {
 
           <button
             type="submit"
-            className="w-full py-3 rounded-xl font-bold text-xs bg-gradient-to-r from-cyan-400 to-sky-500 text-black hover:from-cyan-300 hover:to-sky-400 shadow-[0_0_20px_rgba(56,189,248,0.3)] transition-all flex items-center justify-center gap-2"
+            className="w-full py-3 rounded-xl font-bold text-xs bg-cyan-400 text-black border-2 border-black shadow-[3px_3px_0px_#000] hover:bg-cyan-300 transition-all flex items-center justify-center gap-2"
           >
             <span>Sign In to {selectedRole.toUpperCase()} Dashboard</span>
             <ArrowRight className="w-4 h-4" />

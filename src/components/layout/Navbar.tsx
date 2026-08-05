@@ -30,6 +30,27 @@ export const Navbar: React.FC = () => {
   const [isNotifDrawerOpen, setIsNotifDrawerOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  const navRef = React.useRef<HTMLDivElement>(null);
+  const [sliderStyle, setSliderStyle] = useState({ left: 0, width: 0, opacity: 0 });
+
+  React.useEffect(() => {
+    // Small timeout to allow browser layout to complete before reading offsets
+    const timer = setTimeout(() => {
+      if (!navRef.current) return;
+      const activeButton = navRef.current.querySelector('[data-active="true"]') as HTMLButtonElement;
+      if (activeButton) {
+        setSliderStyle({
+          left: activeButton.offsetLeft,
+          width: activeButton.offsetWidth,
+          opacity: 1
+        });
+      } else {
+        setSliderStyle(prev => ({ ...prev, opacity: 0 }));
+      }
+    }, 10);
+    return () => clearTimeout(timer);
+  }, [activeTab, currentUser.role]);
+
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
   const getRoleBadgeStyle = (role: string) => {
@@ -55,13 +76,10 @@ export const Navbar: React.FC = () => {
               onClick={() => setActiveTab('landing')}
               className="flex items-center gap-3 cursor-pointer group select-none"
             >
-              <div className="relative p-2.5 rounded-xl bg-gradient-to-br from-cyan-500/20 via-sky-600/10 to-indigo-600/20 border border-cyan-500/40 group-hover:border-cyan-400 transition-all shadow-[0_0_15px_rgba(56,189,248,0.2)]">
-                <ShieldCheck className="w-6 h-6 text-cyan-400 group-hover:scale-105 transition-transform" />
-                <Sparkles className="w-3 h-3 text-cyan-300 absolute -top-1 -right-1 animate-pulse" />
-              </div>
+              <img src="/logo.png" alt="Campus Guardian Logo" className="w-8 h-8 object-contain rounded group-hover:scale-105 transition-transform" />
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-extrabold text-lg sm:text-xl tracking-tight text-white group-hover:text-cyan-300 transition-colors">
+                  <span className="font-head font-black text-lg sm:text-xl tracking-tighter uppercase text-white group-hover:text-cyan-300 transition-colors">
                     Campus Guardian
                   </span>
                   <span className="hidden sm:inline-block px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 rounded-full">
@@ -72,55 +90,43 @@ export const Navbar: React.FC = () => {
               </div>
             </div>
 
-            {/* Desktop Navigation Links */}
-            <nav className="hidden md:flex items-center gap-1.5 lg:gap-2">
-              <button
-                onClick={() => setActiveTab('landing')}
-                className={`px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                  activeTab === 'landing'
-                    ? 'bg-slate-800 text-cyan-400 border border-slate-700'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
-                }`}
-              >
-                <Home className="w-3.5 h-3.5" />
-                <span>Home</span>
-              </button>
+            {/* Desktop Navigation Links with sliding background */}
+            <nav 
+              ref={navRef} 
+              className="relative hidden md:flex items-center gap-1.5 lg:gap-2 p-1 bg-slate-950/60 rounded-xl border border-slate-900"
+            >
+              {/* Sliding Highlight Indicator */}
+              <div 
+                className="absolute h-[calc(100%-8px)] top-1 bg-slate-800 border border-slate-700 rounded-lg transition-all duration-300 ease-out pointer-events-none"
+                style={{
+                  left: `${sliderStyle.left}px`,
+                  width: `${sliderStyle.width}px`,
+                  opacity: sliderStyle.opacity
+                }}
+              />
 
-              <button
-                onClick={() => setActiveTab('dashboard')}
-                className={`px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                  activeTab === 'dashboard'
-                    ? 'bg-slate-800 text-cyan-400 border border-slate-700'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
-                }`}
-              >
-                <LayoutDashboard className="w-3.5 h-3.5" />
-                <span className="capitalize">{currentUser.role} Dashboard</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('map')}
-                className={`px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                  activeTab === 'map'
-                    ? 'bg-slate-800 text-cyan-400 border border-slate-700'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
-                }`}
-              >
-                <MapPin className="w-3.5 h-3.5" />
-                <span>Campus Map</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('analytics')}
-                className={`px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                  activeTab === 'analytics'
-                    ? 'bg-slate-800 text-cyan-400 border border-slate-700'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
-                }`}
-              >
-                <BarChart3 className="w-3.5 h-3.5" />
-                <span>Analytics</span>
-              </button>
+              {[
+                { id: 'landing', label: 'Home', icon: Home },
+                { id: 'dashboard', label: `${currentUser.role} Dashboard`, icon: LayoutDashboard },
+                { id: 'map', label: 'Campus Map', icon: MapPin },
+                { id: 'analytics', label: 'Analytics', icon: BarChart3 }
+              ].map((tab) => {
+                const TabIcon = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    data-active={isActive}
+                    onClick={() => setActiveTab(tab.id as any)}
+                    className={`relative z-10 px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors duration-300 ${
+                      isActive ? 'text-cyan-400 font-bold' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <TabIcon className="w-3.5 h-3.5" />
+                    <span className="capitalize">{tab.label}</span>
+                  </button>
+                );
+              })}
             </nav>
 
             {/* Right Action Cluster */}
@@ -128,7 +134,7 @@ export const Navbar: React.FC = () => {
               {/* Report Issue CTA Button */}
               <button
                 onClick={() => setActiveTab('report')}
-                className="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-gradient-to-r from-cyan-500 to-sky-500 text-black hover:from-cyan-400 hover:to-sky-400 shadow-[0_0_20px_rgba(56,189,248,0.35)] flex items-center gap-2 transition-all active:scale-95"
+                className="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-cyan-400 text-black border-2 border-black shadow-[3px_3px_0px_#000] hover:bg-cyan-300 flex items-center gap-2 transition-all active:scale-95"
               >
                 <PlusCircle className="w-4 h-4 stroke-[2.5]" />
                 <span className="hidden sm:inline">Report Issue</span>

@@ -132,7 +132,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({ isOpen, 
                   className={`p-3.5 rounded-xl border transition-all cursor-pointer group ${
                     n.isRead
                       ? 'bg-slate-900/40 border-slate-800/60 hover:bg-slate-800/50 hover:border-slate-700'
-                      : 'bg-gradient-to-r from-cyan-950/30 to-slate-900 border-cyan-500/30 shadow-[0_4px_20px_-5px_rgba(56,189,248,0.15)] hover:border-cyan-400/50'
+                      : 'bg-slate-900 border-2 border-cyan-500 shadow-[3px_3px_0px_#22d3ee] hover:border-cyan-400'
                   }`}
                 >
                   <div className="flex items-start gap-3">

@@ -1,16 +1,58 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=Syne:wght@700;800&display=swap');
 @import "tailwindcss";
+
+@theme {
+  --font-display: "Space Grotesk", sans-serif;
+  --font-head: "Space Grotesk", sans-serif;
+  --font-sans: "Plus Jakarta Sans", sans-serif;
+  --font-mono: "Space Mono", monospace;
+
+  /* Decent Premium Indigo theme override for cyan */
+  --color-cyan-50: #f5f3ff;
+  --color-cyan-100: #ede9fe;
+  --color-cyan-200: #ddd6fe;
+  --color-cyan-300: #c7d2fe;
+  --color-cyan-400: #818cf8;
+  --color-cyan-500: #6366f1;
+  --color-cyan-600: #4f46e5;
+  --color-cyan-700: #4338ca;
+  --color-cyan-800: #3730a3;
+  --color-cyan-900: #312e81;
+  --color-cyan-950: #1e1b4b;
+
+  /* Decent Premium Indigo theme override for sky */
+  --color-sky-50: #f5f3ff;
+  --color-sky-100: #ede9fe;
+  --color-sky-200: #ddd6fe;
+  --color-sky-300: #c7d2fe;
+  --color-sky-400: #818cf8;
+  --color-sky-500: #6366f1;
+  --color-sky-600: #4f46e5;
+  --color-sky-700: #4338ca;
+  --color-sky-800: #3730a3;
+  --color-sky-900: #312e81;
+  --color-sky-950: #1e1b4b;
+}
 
 @layer base {
   body {
-    background-color: #060913;
+    background-color: #080a10;
     color: #f1f5f9;
-    font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     min-height: 100vh;
     overflow-x: hidden;
-    background-image: 
-      radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.08) 0px, transparent 50%),
-      radial-gradient(at 100% 0%, rgba(99, 102, 241, 0.08) 0px, transparent 50%),
-      radial-gradient(at 50% 100%, rgba(14, 165, 233, 0.05) 0px, transparent 50%);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+    letter-spacing: -0.02em;
+  }
+
+  .hero-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: -0.05em;
   }
 
   /* Custom Modern Scrollbar */
@@ -26,47 +68,39 @@
     border-radius: 9999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #38bdf8;
+    background: #6366f1;
   }
 }
 
-/* Glassmorphism Styles */
+/* Brutalist Panel Styles replacing Glassmorphism */
 .glass-panel {
-  background: rgba(17, 26, 46, 0.7);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #0d0f16;
+  border: 2px solid #1e293b;
+  box-shadow: 4px 4px 0px 0px #6366f1;
 }
 
 .glass-panel-hover {
-  transition: all 0.25s ease-in-out;
+  transition: all 0.2s ease-in-out;
 }
 .glass-panel-hover:hover {
-  background: rgba(22, 34, 61, 0.85);
-  border-color: rgba(56, 189, 248, 0.35);
-  transform: translateY(-2px);
-  box-shadow: 0 12px 30px -10px rgba(56, 189, 248, 0.15);
+  background: #121520;
+  border-color: #6366f1;
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0px 0px #6366f1;
 }
 
 .glass-dropdown {
-  background: rgba(15, 23, 42, 0.95);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.7);
+  background: #0a0c12;
+  border: 2px solid #6366f1;
+  box-shadow: 4px 4px 0px 0px #000;
 }
 
 .gradient-text-cyan {
-  background-clip: text;
-  -webkit-background-clip: text;
-  color: transparent;
-  background-image: linear-gradient(to right, #22d3ee, #7dd3fc, #818cf8);
+  color: #22d3ee;
 }
 
 .gradient-text-amber {
-  background-clip: text;
-  -webkit-background-clip: text;
-  color: transparent;
-  background-image: linear-gradient(to right, #f59e0b, #fbbf24, #f97316);
+  color: #fbbf24;
 }
 
 /* AI Scanner Beam Animation */
@@ -120,4 +154,18 @@
 .leaflet-popup-content {
   margin: 12px 14px !important;
   line-height: 1.4 !important;
+}
+
+/* Subtle Technical Grid Background for Hero section */
+.hero-grid {
+  position: absolute;
+  inset: 0;
+  background-size: 32px 32px;
+  background-image: 
+    linear-gradient(to right, rgba(99, 102, 241, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(99, 102, 241, 0.06) 1px, transparent 1px);
+  mask-image: linear-gradient(to bottom, black 40%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 40%, transparent 100%);
+  pointer-events: none;
+  z-index: 0;
 }

@@ -47,7 +47,7 @@ const AppContent: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#060913] text-slate-100 selection:bg-cyan-500 selection:text-black">
+    <div className="min-h-screen flex flex-col bg-[#080a10] text-slate-100 selection:bg-cyan-500 selection:text-black">
       <Navbar />
       <main className="flex-1 w-full">
         {renderActivePage()}

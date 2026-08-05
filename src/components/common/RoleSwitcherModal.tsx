@@ -66,8 +66,8 @@ export const RoleSwitcherModal: React.FC<RoleSwitcherModalProps> = ({ isOpen, on
                 onClick={() => handleSelectUser(user)}
                 className={`p-4 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
                   isSelected
-                    ? 'bg-gradient-to-r from-cyan-950/50 to-slate-900 border-cyan-400 shadow-[0_0_20px_rgba(56,189,248,0.2)]'
-                    : 'bg-slate-900/60 border-slate-800 hover:border-slate-600 hover:bg-slate-800/60'
+                    ? 'bg-slate-950 border-2 border-cyan-400 shadow-[3px_3px_0px_#22d3ee]'
+                    : 'bg-slate-900 border border-slate-800 hover:border-slate-600 hover:bg-slate-800/60'
                 }`}
               >
                 <div className="flex items-center gap-3 min-w-0">
