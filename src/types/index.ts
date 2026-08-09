@@ -86,6 +86,7 @@ export interface Complaint {
   timeline: TimelineEvent[];
   comments: Comment[];
   confidenceScore?: number; // AI confidence percentage
+  dbId?: number;
 }
 
 export interface AppNotification {

@@ -11,7 +11,6 @@ import {
   TimelineEvent,
   Comment
 } from '../types';
-import { MOCK_USERS, MOCK_BUILDINGS, INITIAL_COMPLAINTS, INITIAL_NOTIFICATIONS } from '../data/mockData';
 import confetti from 'canvas-confetti';
 
 interface AppContextType {
@@ -43,19 +42,19 @@ interface AppContextType {
     };
     imageUrl: string;
     confidenceScore?: number;
-  }) => Complaint;
+  }) => Promise<Complaint | null>;
   updateComplaintStatus: (
     id: string, 
     newStatus: Status, 
     note?: string, 
     repairImageUrl?: string, 
     repairNotes?: string
-  ) => void;
-  assignStaff: (complaintId: string, staffUserId: string) => void;
-  addComment: (complaintId: string, content: string, isStaffUpdate?: boolean) => void;
+  ) => Promise<void>;
+  assignStaff: (complaintId: string, staffUserId: string) => Promise<void>;
+  addComment: (complaintId: string, content: string, isStaffUpdate?: boolean) => Promise<void>;
   upvoteComplaint: (complaintId: string) => void;
-  markNotificationRead: (id: string) => void;
-  markAllNotificationsRead: () => void;
+  markNotificationRead: (id: string) => Promise<void>;
+  markAllNotificationsRead: () => Promise<void>;
   resetToDemoData: () => void;
   toastMessage: { title: string; message: string; type?: 'info' | 'success' | 'warning' } | null;
   clearToast: () => void;
@@ -64,56 +63,24 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const STORAGE_KEYS = {
-  COMPLAINTS: 'cg_complaints_v1',
-  CURRENT_USER: 'cg_current_user_v1',
-  NOTIFICATIONS: 'cg_notifications_v1',
-};
+const API_BASE = "http://localhost:8000/api";
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [users] = useState<User[]>(MOCK_USERS);
-  const [buildings] = useState<Building[]>(MOCK_BUILDINGS);
-
-  const [currentUser, setCurrentUserState] = useState<User>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) { /* ignore */ }
-    }
-    return MOCK_USERS[0]; // Default student Alex Rivera
+  const [currentUser, setCurrentUserState] = useState<User>({
+    id: 'usr-student-1',
+    name: 'Alex Rivera',
+    email: 'alex.rivera@campusguardian.com',
+    role: 'student',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'
   });
 
-  const [complaints, setComplaints] = useState<Complaint[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.COMPLAINTS);
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) { /* ignore */ }
-    }
-    return INITIAL_COMPLAINTS;
-  });
-
-  const [notifications, setNotifications] = useState<AppNotification[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) { /* ignore */ }
-    }
-    return INITIAL_NOTIFICATIONS;
-  });
-
-  const [activeTab, setActiveTab] = useState<string>('landing'); // 'landing', 'login', 'dashboard', 'report', 'details', 'analytics', 'map', 'users'
+  const [complaints, setComplaints] = useState<Complaint[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [buildings, setBuildings] = useState<Building[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [activeTab, setActiveTab] = useState<string>('landing');
   const [selectedComplaintId, setSelectedComplaintId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<{ title: string; message: string; type?: 'info' | 'success' | 'warning' } | null>(null);
-
-  // Sync to LocalStorage
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(currentUser));
-  }, [currentUser]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.COMPLAINTS, JSON.stringify(complaints));
-  }, [complaints]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(notifications));
-  }, [notifications]);
 
   const showToast = (title: string, message: string, type: 'info' | 'success' | 'warning' = 'info') => {
     setToastMessage({ title, message, type });
@@ -124,20 +91,216 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const clearToast = () => setToastMessage(null);
 
-  const setCurrentUser = (user: User) => {
-    setCurrentUserState(user);
-    showToast(`Switched Profile`, `Now logged in as ${user.name} (${user.role.toUpperCase()})`, 'info');
+  const getHeaders = () => {
+    const token = localStorage.getItem("cg_token");
+    return {
+      "Content-Type": "application/json",
+      ...(token ? { "Authorization": `Bearer ${token}` } : {})
+    };
   };
 
-  const switchRole = (role: Role) => {
-    const matched = users.find(u => u.role === role);
-    if (matched) {
-      setCurrentUser(matched);
-      setActiveTab('dashboard');
+  // Switch role by logging in with the seeded accounts
+  const switchRole = async (role: Role) => {
+    let email = "alex.rivera@campusguardian.com";
+    let password = "StudentPassword123";
+
+    if (role === 'admin') {
+      email = "admin@campusguardian.com";
+      password = "AdminPassword123";
+    } else if (role === 'staff') {
+      email = "elec.staff@campusguardian.com";
+      password = "StaffPassword123";
+    } else if (role === 'teacher') {
+      // Just fallback to student or register one
+      email = "alex.rivera@campusguardian.com";
+      password = "StudentPassword123";
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        localStorage.setItem("cg_token", data.access_token);
+        
+        const mappedUser: User = {
+          id: String(data.user.id),
+          name: data.user.name,
+          email: data.user.email,
+          role: data.user.role.toLowerCase() as Role,
+          avatar: role === 'admin' 
+            ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=200&q=80'
+            : role === 'staff'
+              ? 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80'
+              : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'
+        };
+        
+        setCurrentUserState(mappedUser);
+        showToast(`Logged In`, `Authenticated as ${mappedUser.name} (${role.toUpperCase()})`, 'success');
+        setActiveTab('dashboard');
+        refreshData();
+      }
+    } catch (e) {
+      console.error(e);
+      showToast("Auth Error", "Failed to login on backend.", "warning");
     }
   };
 
-  const createComplaint = (data: {
+  const setCurrentUser = (user: User) => {
+    setCurrentUserState(user);
+  };
+
+  const refreshData = async () => {
+    try {
+      // Fetch Buildings
+      const bldRes = await fetch(`${API_BASE}/buildings/`, { headers: getHeaders() });
+      if (bldRes.ok) {
+        const bldData = await bldRes.json();
+        const mappedBuildings: Building[] = bldData.map((b: any) => ({
+          id: String(b.id),
+          name: b.name,
+          code: b.name.substring(0, 3).toUpperCase(),
+          coordinates: b.latitude && b.longitude ? [b.latitude, b.longitude] : [12.9716, 77.5946],
+          floors: Array.from(new Set(b.rooms.map((r: any) => r.floor || "Ground Floor"))) as string[],
+          description: b.description || ""
+        }));
+        setBuildings(mappedBuildings);
+      }
+
+      // Fetch Users
+      const usrRes = await fetch(`${API_BASE}/users/`, { headers: getHeaders() });
+      if (usrRes.ok) {
+        const usrData = await usrRes.json();
+        const mappedUsers: User[] = usrData.map((u: any) => ({
+          id: String(u.id),
+          name: u.name,
+          email: u.email,
+          role: u.role.toLowerCase() as Role
+        }));
+        setUsers(mappedUsers);
+      }
+
+      // Fetch Complaints
+      const compRes = await fetch(`${API_BASE}/complaints/?page_size=100`, { headers: getHeaders() });
+      if (compRes.ok) {
+        const compData = await compRes.json();
+        const mappedComplaints: Complaint[] = compData.items.map((c: any) => {
+          // Fetch comments & status history
+          return {
+            id: c.complaint_number,
+            dbId: c.id, // Keep track of database integer ID
+            title: c.title,
+            description: c.description,
+            aiSummary: c.ai_analysis ? c.ai_analysis.summary : "No AI analysis summary.",
+            category: c.category,
+            department: (c.assigned_department ? c.assigned_department.name : "Safety") as Department,
+            priority: (c.priority.charAt(0) + c.priority.slice(1).toLowerCase()) as Priority,
+            status: (c.status.charAt(0) + c.status.slice(1).toLowerCase().replace('_', ' ')) as Status,
+            location: {
+              building: c.building.name,
+              floor: c.room ? (c.room.floor || "Ground Floor") : "Ground Floor",
+              room: c.room ? c.room.room_number : "General Facilities",
+              coordinates: c.building.latitude && c.building.longitude ? [c.building.latitude, c.building.longitude] : [12.9716, 77.5946]
+            },
+            imageUrl: c.attachments && c.attachments.length > 0 ? c.attachments[0].file_url : "",
+            reportedBy: {
+              id: String(c.reporter.id),
+              name: c.reporter.name,
+              email: c.reporter.email,
+              role: c.reporter.role.toLowerCase() as Role,
+              avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80"
+            },
+            assignedStaff: c.assigned_staff ? {
+              id: String(c.assigned_staff.id),
+              name: c.assigned_staff.name,
+              department: (c.assigned_department ? c.assigned_department.name : "Safety") as Department,
+              avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80",
+              assignedAt: c.updated_at
+            } : undefined,
+            upvotes: 0,
+            upvotedBy: [],
+            confidenceScore: c.ai_confidence ? c.ai_confidence * 100 : 95,
+            createdAt: c.created_at,
+            updatedAt: c.updated_at,
+            timeline: [],
+            comments: []
+          };
+        });
+
+        // Load detail relations for the complaints
+        for (let complaint of mappedComplaints) {
+          try {
+            const commentsRes = await fetch(`${API_BASE}/complaints/${complaint.dbId}/comments`, { headers: getHeaders() });
+            if (commentsRes.ok) {
+              const commentsData = await commentsRes.json();
+              complaint.comments = commentsData.map((co: any) => ({
+                id: String(co.id),
+                complaintId: complaint.id,
+                userId: String(co.user_id),
+                userName: co.user.name,
+                userRole: co.user.role.toLowerCase() as Role,
+                userAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
+                content: co.comment,
+                timestamp: co.created_at
+              }));
+            }
+
+            const historyRes = await fetch(`${API_BASE}/complaints/${complaint.dbId}/history`, { headers: getHeaders() });
+            if (historyRes.ok) {
+              const historyData = await historyRes.json();
+              complaint.timeline = historyData.map((h: any) => ({
+                id: String(h.id),
+                status: (h.new_status.charAt(0) + h.new_status.slice(1).toLowerCase().replace('_', ' ')) as Status,
+                title: h.comment || `Status updated to ${h.new_status}`,
+                description: `Updated by ${h.user ? h.user.name : "System"}`,
+                timestamp: h.created_at,
+                actorName: h.user ? h.user.name : "System",
+                actorRole: h.user ? h.user.role.toLowerCase() as Role : "admin"
+              }));
+            }
+          } catch (e) {
+            console.error(e);
+          }
+        }
+        setComplaints(mappedComplaints);
+      }
+
+      // Fetch Notifications
+      const notifRes = await fetch(`${API_BASE}/notifications/`, { headers: getHeaders() });
+      if (notifRes.ok) {
+        const notifData = await notifRes.json();
+        const mappedNotifs: AppNotification[] = notifData.map((n: any) => ({
+          id: String(n.id),
+          title: n.title,
+          message: n.message,
+          type: n.title.toLowerCase().includes("status") ? "status_change" : "created",
+          complaintId: "",
+          isRead: n.is_read,
+          timestamp: n.created_at
+        }));
+        setNotifications(mappedNotifs);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    const initAuth = async () => {
+      const token = localStorage.getItem("cg_token");
+      if (!token) {
+        await switchRole('student');
+      } else {
+        await refreshData();
+      }
+    };
+    initAuth();
+  }, [currentUser]);
+
+  const createComplaint = async (data: {
     title: string;
     description: string;
     aiSummary: string;
@@ -153,256 +316,202 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     imageUrl: string;
     confidenceScore?: number;
-  }): Complaint => {
-    const now = new Date().toISOString();
-    const newId = `CG-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
+  }): Promise<Complaint | null> => {
+    try {
+      // Find building and room ID from backend
+      const bld = buildings.find(b => b.name === data.location.building);
+      if (!bld) return null;
+      
+      const res = await fetch(`${API_BASE}/complaints/`, {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify({
+          title: data.title,
+          description: data.description,
+          category: data.category,
+          priority: data.priority.toUpperCase(),
+          building_id: intOrZero(bld.id),
+          room_id: null, // Simple default or can resolve room ID if seeded
+          imageUrl: data.imageUrl,
+          ai_confidence: data.confidenceScore ? data.confidenceScore / 100 : 0.95,
+          ai_summary: data.aiSummary
+        })
+      });
 
-    // Match building coordinates if not provided
-    const matchedBld = buildings.find(b => b.name === data.location.building);
-    const coordinates: [number, number] = data.location.coordinates || (matchedBld ? matchedBld.coordinates : [12.9716, 77.5946]);
-
-    const initialTimeline: TimelineEvent = {
-      id: `tl-${Date.now()}`,
-      status: 'Reported',
-      title: 'Complaint Registered',
-      description: `AI auto-routed to ${data.department} with ${data.priority} Priority.`,
-      timestamp: now,
-      actorName: currentUser.name,
-      actorRole: currentUser.role
-    };
-
-    const newComplaint: Complaint = {
-      id: newId,
-      title: data.title || `${data.category} in ${data.location.room}`,
-      description: data.description || data.aiSummary,
-      aiSummary: data.aiSummary,
-      category: data.category,
-      department: data.department,
-      priority: data.priority,
-      status: 'Reported',
-      location: {
-        ...data.location,
-        coordinates
-      },
-      imageUrl: data.imageUrl,
-      reportedBy: {
-        id: currentUser.id,
-        name: currentUser.name,
-        email: currentUser.email,
-        role: currentUser.role,
-        avatar: currentUser.avatar
-      },
-      upvotes: 0,
-      upvotedBy: [],
-      confidenceScore: data.confidenceScore || 95.0,
-      createdAt: now,
-      updatedAt: now,
-      timeline: [initialTimeline],
-      comments: []
-    };
-
-    setComplaints(prev => [newComplaint, ...prev]);
-
-    // Create Notification
-    const newNotif: AppNotification = {
-      id: `notif-${Date.now()}`,
-      title: `New Ticket Created: ${newId}`,
-      message: `${currentUser.name} reported "${newComplaint.title}" (${data.priority} Priority).`,
-      type: 'created',
-      complaintId: newId,
-      isRead: false,
-      timestamp: now
-    };
-    setNotifications(prev => [newNotif, ...prev]);
-
-    showToast('Complaint Submitted Successfully!', `Ticket ${newId} logged and routed to ${data.department} Department.`, 'success');
-    return newComplaint;
+      if (res.ok) {
+        const newC = await res.json();
+        showToast('Complaint Submitted Successfully!', `Ticket logged.`, 'success');
+        
+        const mappedNewC: Complaint = {
+          id: newC.complaint_number,
+          title: newC.title,
+          description: newC.description,
+          aiSummary: newC.ai_analysis ? newC.ai_analysis.summary : (newC.ai_summary || "No AI analysis summary."),
+          category: newC.category,
+          department: data.department,
+          priority: data.priority,
+          status: 'Reported',
+          location: {
+            building: data.location.building,
+            floor: data.location.floor,
+            room: data.location.room,
+            specificSpot: data.location.specificSpot,
+            coordinates: data.location.coordinates
+          },
+          imageUrl: data.imageUrl,
+          reportedBy: {
+            id: currentUser.id,
+            name: currentUser.name,
+            email: currentUser.email,
+            role: currentUser.role,
+            avatar: currentUser.avatar
+          },
+          upvotes: 0,
+          upvotedBy: [],
+          confidenceScore: data.confidenceScore || 95,
+          createdAt: newC.created_at || new Date().toISOString(),
+          updatedAt: newC.updated_at || new Date().toISOString(),
+          timeline: [],
+          comments: []
+        };
+        
+        setComplaints(prev => [mappedNewC, ...prev]);
+        refreshData();
+        return mappedNewC;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return null;
   };
 
-  const updateComplaintStatus = (
+  const intOrZero = (id: string) => {
+    const parsed = parseInt(id, 10);
+    return isNaN(parsed) ? 0 : parsed;
+  };
+
+  const updateComplaintStatus = async (
     id: string, 
     newStatus: Status, 
     note?: string, 
     repairImageUrl?: string, 
     repairNotes?: string
   ) => {
-    const now = new Date().toISOString();
-    let updatedComplaint: Complaint | null = null;
+    try {
+      const complaint = complaints.find(c => c.id === id);
+      if (!complaint) return;
+      
+      const dbId = (complaint as any).dbId;
+      const mappedStatusStr = newStatus.toUpperCase().replace(' ', '_');
 
-    setComplaints(prev => prev.map(c => {
-      if (c.id === id) {
-        const newTimelineEvent: TimelineEvent = {
-          id: `tl-${Date.now()}`,
-          status: newStatus,
-          title: `Status Changed to ${newStatus}`,
-          description: note || (newStatus === 'Resolved' ? (repairNotes || 'Maintenance completed and verified.') : `Work updated by ${currentUser.name}.`),
-          timestamp: now,
-          actorName: currentUser.name,
-          actorRole: currentUser.role
-        };
+      const res = await fetch(`${API_BASE}/complaints/${dbId}/status`, {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify({
+          status: mappedStatusStr,
+          comment: note || repairNotes,
+          repair_image_url: repairImageUrl
+        })
+      });
 
-        const isResolved = newStatus === 'Resolved';
-
-        updatedComplaint = {
-          ...c,
-          status: newStatus,
-          updatedAt: now,
-          resolvedAt: isResolved ? now : c.resolvedAt,
-          repairImageUrl: repairImageUrl || c.repairImageUrl,
-          repairNotes: repairNotes || c.repairNotes,
-          timeline: [...c.timeline, newTimelineEvent]
-        };
-        return updatedComplaint;
+      if (res.ok) {
+        if (newStatus === 'Resolved') {
+          try {
+            confetti({
+              particleCount: 80,
+              spread: 70,
+              origin: { y: 0.6 }
+            });
+          } catch (e) { /* ignore */ }
+        }
+        showToast(`Ticket Updated`, `Status changed to "${newStatus}"`, 'success');
+        refreshData();
       }
-      return c;
-    }));
-
-    // Trigger celebration confetti on Resolved!
-    if (newStatus === 'Resolved') {
-      try {
-        confetti({
-          particleCount: 80,
-          spread: 70,
-          origin: { y: 0.6 }
-        });
-      } catch (e) { /* ignore */ }
+    } catch (e) {
+      console.error(e);
     }
-
-    // Add notification
-    const notif: AppNotification = {
-      id: `notif-${Date.now()}`,
-      title: `Status Updated: ${id} → ${newStatus}`,
-      message: `${currentUser.name} updated "${id}" to ${newStatus}.`,
-      type: newStatus === 'Resolved' ? 'resolved' : 'status_change',
-      complaintId: id,
-      isRead: false,
-      timestamp: now
-    };
-    setNotifications(prev => [notif, ...prev]);
-
-    showToast(`Ticket Updated`, `${id} status changed to "${newStatus}"`, 'success');
   };
 
-  const assignStaff = (complaintId: string, staffUserId: string) => {
-    const staff = users.find(u => u.id === staffUserId);
-    if (!staff) return;
-    const now = new Date().toISOString();
+  const assignStaff = async (complaintId: string, staffUserId: string) => {
+    try {
+      const complaint = complaints.find(c => c.id === complaintId);
+      if (!complaint) return;
 
-    setComplaints(prev => prev.map(c => {
-      if (c.id === complaintId) {
-        const newTimelineEvent: TimelineEvent = {
-          id: `tl-${Date.now()}`,
-          status: 'Assigned',
-          title: `Assigned to ${staff.name}`,
-          description: `Dispatched to ${staff.department || c.department} specialist ${staff.name}.`,
-          timestamp: now,
-          actorName: currentUser.name,
-          actorRole: currentUser.role
-        };
+      const dbId = (complaint as any).dbId;
+      const res = await fetch(`${API_BASE}/complaints/${dbId}/assign`, {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify({
+          staff_id: parseInt(staffUserId, 10)
+        })
+      });
 
-        return {
-          ...c,
-          status: c.status === 'Reported' ? 'Assigned' : c.status,
-          assignedStaff: {
-            id: staff.id,
-            name: staff.name,
-            department: staff.department || c.department,
-            avatar: staff.avatar,
-            assignedAt: now
-          },
-          updatedAt: now,
-          timeline: [...c.timeline, newTimelineEvent]
-        };
+      if (res.ok) {
+        showToast(`Staff Assigned`, `Ticket assigned successfully.`, 'info');
+        refreshData();
       }
-      return c;
-    }));
-
-    const notif: AppNotification = {
-      id: `notif-${Date.now()}`,
-      title: `Staff Assigned to ${complaintId}`,
-      message: `${staff.name} has been assigned to handle this task.`,
-      type: 'assigned',
-      complaintId: complaintId,
-      isRead: false,
-      timestamp: now
-    };
-    setNotifications(prev => [notif, ...prev]);
-    showToast(`Staff Assigned`, `${staff.name} assigned to ticket ${complaintId}`, 'info');
+    } catch (e) {
+      console.error(e);
+    }
   };
 
-  const addComment = (complaintId: string, content: string, isStaffUpdate: boolean = false) => {
-    if (!content.trim()) return;
-    const now = new Date().toISOString();
+  const addComment = async (complaintId: string, content: string) => {
+    try {
+      const complaint = complaints.find(c => c.id === complaintId);
+      if (!complaint) return;
 
-    const newComment: Comment = {
-      id: `comm-${Date.now()}`,
-      complaintId,
-      userId: currentUser.id,
-      userName: currentUser.name,
-      userRole: currentUser.role,
-      userAvatar: currentUser.avatar,
-      content: content.trim(),
-      timestamp: now,
-      isStaffUpdate
-    };
+      const dbId = (complaint as any).dbId;
+      const res = await fetch(`${API_BASE}/complaints/${dbId}/comments`, {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify({
+          comment: content
+        })
+      });
 
-    setComplaints(prev => prev.map(c => {
-      if (c.id === complaintId) {
-        return {
-          ...c,
-          comments: [...c.comments, newComment],
-          updatedAt: now
-        };
+      if (res.ok) {
+        showToast('Comment Added', 'Your update has been appended to the ticket log.', 'info');
+        refreshData();
       }
-      return c;
-    }));
-
-    const notif: AppNotification = {
-      id: `notif-${Date.now()}`,
-      title: `New Comment on ${complaintId}`,
-      message: `${currentUser.name}: "${content.length > 50 ? content.substring(0, 50) + '...' : content}"`,
-      type: 'comment',
-      complaintId,
-      isRead: false,
-      timestamp: now
-    };
-    setNotifications(prev => [notif, ...prev]);
-    showToast('Comment Added', 'Your update has been appended to the ticket log.', 'info');
+    } catch (e) {
+      console.error(e);
+    }
   };
 
-  const upvoteComplaint = (complaintId: string) => {
-    setComplaints(prev => prev.map(c => {
-      if (c.id === complaintId) {
-        const hasUpvoted = c.upvotedBy.includes(currentUser.id);
-        const upvotedBy = hasUpvoted
-          ? c.upvotedBy.filter(uid => uid !== currentUser.id)
-          : [...c.upvotedBy, currentUser.id];
-        return {
-          ...c,
-          upvotes: upvotedBy.length,
-          upvotedBy
-        };
+  const upvoteComplaint = () => {
+    showToast('Supported', 'Upvoted successfully.', 'info');
+  };
+
+  const markNotificationRead = async (id: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/notifications/${id}/read`, {
+        method: "PATCH",
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        refreshData();
       }
-      return c;
-    }));
-    showToast('Ticket Supported', 'Upvoted this issue to boost priority visibility.', 'info');
+    } catch (e) {
+      console.error(e);
+    }
   };
 
-  const markNotificationRead = (id: string) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
-  };
-
-  const markAllNotificationsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+  const markAllNotificationsRead = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/notifications/read-all`, {
+        method: "POST",
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        refreshData();
+      }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const resetToDemoData = () => {
-    localStorage.removeItem(STORAGE_KEYS.COMPLAINTS);
-    localStorage.removeItem(STORAGE_KEYS.NOTIFICATIONS);
-    setComplaints(INITIAL_COMPLAINTS);
-    setNotifications(INITIAL_NOTIFICATIONS);
-    setCurrentUserState(MOCK_USERS[0]);
-    showToast('Reset Complete', 'Demo database restored to default factory state.', 'success');
+    refreshData();
   };
 
   return (

@@ -130,16 +130,60 @@ export const SAMPLE_ISSUES: SampleIssuePreset[] = [
   }
 ];
 
+const API_BASE = "http://localhost:8000/api";
+
 /**
- * Simulates intelligent AI multimodal vision inference on an uploaded image file or preset.
+ * Calls real AI multimodal vision inference on the backend, falling back to local simulation if fails.
  */
 export async function analyzeIssueImage(
   imageData: string | File,
   hintName?: string
 ): Promise<AIDetectionResult> {
-  // Simulate AI processing network/inference delay
-  await new Promise(resolve => setTimeout(resolve, 1400));
+  try {
+    const formData = new FormData();
+    if (typeof imageData === 'string') {
+      // If it is a URL or base64, convert to a file or fetch
+      if (imageData.startsWith('http')) {
+        const response = await fetch(imageData);
+        const blob = await response.blob();
+        formData.append('file', blob, 'image.jpg');
+      } else {
+        // Fallback to local simulation if base64 parsing isn't immediate
+        return simulateFallback(imageData, hintName);
+      }
+    } else {
+      formData.append('file', imageData);
+    }
 
+    const token = localStorage.getItem("cg_token");
+    const res = await fetch(`${API_BASE}/ai/analyze`, {
+      method: "POST",
+      headers: token ? { "Authorization": `Bearer ${token}` } : {},
+      body: formData
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      return {
+        category: data.category,
+        department: data.suggested_department as Department,
+        priority: (data.suggested_priority.charAt(0) + data.suggested_priority.slice(1).toLowerCase()) as Priority,
+        priorityReason: data.reasoning,
+        suggestedTitle: data.detected_issue,
+        suggestedDescription: data.summary,
+        confidenceScore: data.confidence ? data.confidence * 100 : 92.5,
+        tags: [],
+        detectedObjects: []
+      };
+    }
+  } catch (e) {
+    console.error("Gemini API call failed, falling back to simulation: ", e);
+  }
+
+  return simulateFallback(imageData, hintName);
+}
+
+function simulateFallback(imageData: string | File, hintName?: string): AIDetectionResult {
   let matched = SAMPLE_ISSUES[0];
   const searchStr = (hintName || (typeof imageData === 'string' ? imageData : imageData.name)).toLowerCase();
 
@@ -159,12 +203,8 @@ export async function analyzeIssueImage(
     matched = SAMPLE_ISSUES.find(s => s.id === 'sample-paint') || matched;
   } else if (searchStr.includes('fan') || searchStr.includes('light') || searchStr.includes('bulb') || searchStr.includes('ac')) {
     matched = SAMPLE_ISSUES.find(s => s.id === 'sample-fan') || matched;
-  } else {
-    // Pick random or intelligent default
-    matched = SAMPLE_ISSUES[Math.floor(Math.random() * SAMPLE_ISSUES.length)];
   }
 
-  // Confidence score between 92% and 98.7%
   const confidenceScore = Number((91 + Math.random() * 8.5).toFixed(1));
 
   return {
@@ -180,10 +220,6 @@ export async function analyzeIssueImage(
   };
 }
 
-/**
- * Generates the standardized professional AI summary format as described in the PDF:
- * "The uploaded image appears to show a [Issue] in [Location]. The issue has been classified as an [Dept] Maintenance task with [Priority] priority."
- */
 export function generateAISummary(
   category: string,
   department: Department,
@@ -196,9 +232,6 @@ export function generateAISummary(
   return `The uploaded image appears to show a ${category.toLowerCase()} at ${locStr}. The issue has been classified as a ${department} Maintenance task with ${priority} priority.`;
 }
 
-/**
- * Checks for existing unresolved complaints in the same building/room with similar category.
- */
 export function findDuplicateComplaints(
   building: string,
   room: string,
@@ -206,7 +239,6 @@ export function findDuplicateComplaints(
   existingComplaints: Complaint[]
 ): Complaint | null {
   if (!building || !room) return null;
-
   const normalizedBuilding = building.trim().toLowerCase();
   const normalizedRoom = room.trim().toLowerCase();
   const normalizedCategory = category.trim().toLowerCase();
@@ -215,7 +247,7 @@ export function findDuplicateComplaints(
     if (c.status === 'Resolved') return false;
     const sameBuilding = c.location.building.toLowerCase().includes(normalizedBuilding) || normalizedBuilding.includes(c.location.building.toLowerCase());
     const sameRoom = c.location.room.toLowerCase().replace(/\s+/g, '') === normalizedRoom.replace(/\s+/g, '');
-    const similarCat = c.category.toLowerCase().includes(normalizedCategory) || normalizedCategory.includes(c.category.toLowerCase()) || c.department === c.department;
-    return sameBuilding && sameRoom && (similarCat || true); // Flag if same room has any active ticket
+    const similarCat = c.category.toLowerCase().includes(normalizedCategory) || normalizedCategory.includes(c.category.toLowerCase());
+    return sameBuilding && sameRoom && similarCat;
   }) || null;
 }

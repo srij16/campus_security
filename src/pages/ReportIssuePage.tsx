@@ -123,14 +123,14 @@ export const ReportIssuePage: React.FC = () => {
   };
 
   // Handle Submit
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedImage) {
       showToast('Image Required', 'Please upload or select an issue photograph.', 'warning');
       return;
     }
 
-    const created = createComplaint({
+    const created = await createComplaint({
       title: issueTitle || `${category} in ${roomNumber}`,
       description: description || aiSummary,
       aiSummary: aiSummary || description,
@@ -147,8 +147,10 @@ export const ReportIssuePage: React.FC = () => {
       confidenceScore: aiConfidence || 95.0
     });
 
-    setSelectedComplaintId(created.id);
-    setActiveTab('details');
+    if (created) {
+      setSelectedComplaintId(created.id);
+      setActiveTab('details');
+    }
   };
 
   return (
