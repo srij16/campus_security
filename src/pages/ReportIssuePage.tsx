@@ -42,8 +42,8 @@ export const ReportIssuePage: React.FC = () => {
   const [aiConfidence, setAiConfidence] = useState<number | null>(96.4);
 
   // Form Fields (Editable by user)
-  const [building, setBuilding] = useState<string>(buildings[0].name);
-  const [floor, setFloor] = useState<string>(buildings[0].floors[0]);
+  const [building, setBuilding] = useState<string>(buildings[0]?.name || '');
+  const [floor, setFloor] = useState<string>(buildings[0]?.floors?.[0] || '');
   const [roomNumber, setRoomNumber] = useState<string>('Room 101');
   const [specificSpot, setSpecificSpot] = useState<string>('Center ceiling fixture');
   
@@ -60,7 +60,7 @@ export const ReportIssuePage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Update floors when building changes
-  const selectedBuildingData = buildings.find((b: any) => b.name === building) || buildings[0];
+  const selectedBuildingData = buildings.find((b: any) => b.name === building) || buildings[0] || { floors: [] };
 
   // Run AI Image Analysis
   const runAIAnalysis = async (imageUrl: string, filename: string) => {
@@ -91,6 +91,17 @@ export const ReportIssuePage: React.FC = () => {
       setIsScanning(false);
     }
   };
+  // Sync building and floor when buildings load
+  useEffect(() => {
+    if (buildings.length > 0) {
+      if (!building) {
+        setBuilding(buildings[0].name);
+      }
+      if (!floor && buildings[0].floors && buildings[0].floors.length > 0) {
+        setFloor(buildings[0].floors[0]);
+      }
+    }
+  }, [buildings, building, floor]);
 
   // Check duplicate whenever building, room, or category changes
   useEffect(() => {
@@ -103,6 +114,69 @@ export const ReportIssuePage: React.FC = () => {
     const summary = generateAISummary(category, department, priority, { building, room: roomNumber });
     setAiSummary(summary);
   }, [category, department, priority, building, roomNumber]);
+
+  // Geolocation & Camera state
+  const [gpsCoordinates, setGpsCoordinates] = useState<[number, number] | undefined>(undefined);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [stream, setStream] = useState<MediaStream | null>(null);
+
+  // Capture GPS coordinates on load or manual trigger
+  const requestLocation = () => {
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setGpsCoordinates([pos.coords.latitude, pos.coords.longitude]);
+          showToast('GPS Lock Acquired', `Lat: ${pos.coords.latitude.toFixed(4)}, Lng: ${pos.coords.longitude.toFixed(4)}`, 'success');
+        },
+        (err) => {
+          showToast('Location Denied', 'GPS signal unavailable. Please select facility manually.', 'warning');
+        }
+      );
+    }
+  };
+
+  useEffect(() => {
+    requestLocation();
+  }, []);
+
+  // Web Camera Capture handlers
+  const startCamera = async () => {
+    setIsCapturing(true);
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      setStream(mediaStream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+      }
+    } catch (err) {
+      showToast('Camera Error', 'Could not access device camera. Falling back to upload.', 'warning');
+      setIsCapturing(false);
+    }
+  };
+
+  const stopCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+    }
+    setIsCapturing(false);
+  };
+
+  const takePhoto = () => {
+    if (videoRef.current) {
+      const canvas = document.createElement('canvas');
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg');
+        runAIAnalysis(dataUrl, 'camera_capture.jpg');
+      }
+    }
+    stopCamera();
+  };
 
   // Handle custom file upload
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -130,6 +204,34 @@ export const ReportIssuePage: React.FC = () => {
       return;
     }
 
+    // Offline state handling
+    if (!navigator.onLine) {
+      // Store in localStorage draft queue
+      const offlineDrafts = JSON.parse(localStorage.getItem('cg_offline_drafts') || '[]');
+      const newDraft = {
+        title: issueTitle || `${category} in ${roomNumber}`,
+        description: description || aiSummary,
+        aiSummary: aiSummary || description,
+        category,
+        department,
+        priority,
+        location: {
+          building,
+          floor,
+          room: roomNumber,
+          specificSpot,
+          coordinates: gpsCoordinates
+        },
+        imageUrl: selectedImage,
+        confidenceScore: aiConfidence || 95.0
+      };
+      offlineDrafts.push(newDraft);
+      localStorage.setItem('cg_offline_drafts', JSON.stringify(offlineDrafts));
+      showToast("Offline mode", "You're offline. Your report will be submitted when you're back online.", "warning");
+      setActiveTab('dashboard');
+      return;
+    }
+
     const created = await createComplaint({
       title: issueTitle || `${category} in ${roomNumber}`,
       description: description || aiSummary,
@@ -141,7 +243,8 @@ export const ReportIssuePage: React.FC = () => {
         building,
         floor,
         room: roomNumber,
-        specificSpot
+        specificSpot,
+        coordinates: gpsCoordinates
       },
       imageUrl: selectedImage,
       confidenceScore: aiConfidence || 95.0
@@ -152,6 +255,22 @@ export const ReportIssuePage: React.FC = () => {
       setActiveTab('details');
     }
   };
+
+  // Online auto-retry effect
+  useEffect(() => {
+    const handleOnline = async () => {
+      const drafts = JSON.parse(localStorage.getItem('cg_offline_drafts') || '[]');
+      if (drafts.length > 0) {
+        showToast("Reconnected", "Syncing offline drafts to backend...", "info");
+        for (const draft of drafts) {
+          await createComplaint(draft);
+        }
+        localStorage.removeItem('cg_offline_drafts');
+      }
+    };
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [complaints]);
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -234,9 +353,34 @@ export const ReportIssuePage: React.FC = () => {
               )}
             </div>
 
-            {/* Viewport with Scanner Beam */}
+            {/* Viewport with Scanner Beam or Camera Stream */}
             <div className="relative h-64 sm:h-72 w-full rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 flex items-center justify-center group">
-              {selectedImage ? (
+              {isCapturing ? (
+                <div className="relative w-full h-full">
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={takePhoto}
+                      className="px-4 py-2 bg-emerald-500 text-black text-xs font-bold rounded-xl shadow-lg"
+                    >
+                      Snap Photo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={stopCamera}
+                      className="px-4 py-2 bg-rose-600 text-white text-xs font-bold rounded-xl"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : selectedImage ? (
                 <>
                   <img
                     src={selectedImage}
@@ -269,7 +413,7 @@ export const ReportIssuePage: React.FC = () => {
               )}
             </div>
 
-            {/* Upload Buttons */}
+            {/* Upload & Camera Buttons */}
             <input
               type="file"
               ref={fileInputRef}
@@ -281,11 +425,20 @@ export const ReportIssuePage: React.FC = () => {
             <div className="flex gap-2.5">
               <button
                 type="button"
+                onClick={startCamera}
+                className="flex-1 py-2.5 rounded-xl bg-cyan-500 text-black text-xs font-bold flex items-center justify-center gap-2 transition-colors border-2 border-black shadow-[2px_2px_0px_#000]"
+              >
+                <Camera className="w-4 h-4" />
+                <span>Take Photo</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => fileInputRef.current?.click()}
                 className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold flex items-center justify-center gap-2 transition-colors border border-slate-700"
               >
                 <Upload className="w-4 h-4 text-cyan-400" />
-                <span>Upload From Device</span>
+                <span>Gallery</span>
               </button>
             </div>
           </div>

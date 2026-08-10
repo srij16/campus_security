@@ -10,3 +10,5 @@ from app.models.ai_analysis import AIAnalysis  # noqa
 from app.models.status_history import StatusHistory  # noqa
 from app.models.comment import Comment  # noqa
 from app.models.notification import Notification  # noqa
+from app.models.audit_log import AuditLog  # noqa
+

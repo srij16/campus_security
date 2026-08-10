@@ -59,7 +59,22 @@ interface AppContextType {
   toastMessage: { title: string; message: string; type?: 'info' | 'success' | 'warning' } | null;
   clearToast: () => void;
   showToast: (title: string, message: string, type?: 'info' | 'success' | 'warning') => void;
+  login: (email: string, password: string) => Promise<boolean>;
+  
+  // Analytics & Auditing extension
+  analyticsOverview: any;
+  analyticsByDept: any[];
+  analyticsByBuilding: any[];
+  analyticsByPriority: any[];
+  analyticsTrends: any[];
+  analyticsResolutionTimes: any[];
+  analyticsHotspots: any[];
+  auditLogs: any[];
+  verifyUser: (userId: string, status: string, reason?: string) => Promise<void>;
+  updateUserRole: (userId: string, role: string) => Promise<void>;
+  fetchAuditLogs: () => Promise<void>;
 }
+
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
@@ -67,20 +82,50 @@ const API_BASE = "http://localhost:8000/api";
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUserState] = useState<User>({
-    id: 'usr-student-1',
-    name: 'Alex Rivera',
-    email: 'alex.rivera@campusguardian.com',
+    id: '',
+    name: '',
+    email: '',
     role: 'student',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'
+    avatar: ''
   });
 
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [activeTab, setActiveTab] = useState<string>('landing');
+  const [activeTab, setActiveTabState] = useState<string>(() => {
+    const hash = window.location.hash.replace('#/', '') || 'landing';
+    return ['landing', 'login', 'report', 'details', 'map', 'dashboard', 'analytics'].includes(hash) ? hash : 'landing';
+  });
+
+  const setActiveTab = (tab: string) => {
+    setActiveTabState(tab);
+    window.location.hash = `#/${tab}`;
+  };
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#/', '') || 'landing';
+      if (['landing', 'login', 'report', 'details', 'map', 'dashboard', 'analytics'].includes(hash)) {
+        setActiveTabState(hash);
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
   const [selectedComplaintId, setSelectedComplaintId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<{ title: string; message: string; type?: 'info' | 'success' | 'warning' } | null>(null);
+
+  // New Analytics & Auditing State
+  const [analyticsOverview, setAnalyticsOverview] = useState<any>(null);
+  const [analyticsByDept, setAnalyticsByDept] = useState<any[]>([]);
+  const [analyticsByBuilding, setAnalyticsByBuilding] = useState<any[]>([]);
+  const [analyticsByPriority, setAnalyticsByPriority] = useState<any[]>([]);
+  const [analyticsTrends, setAnalyticsTrends] = useState<any[]>([]);
+  const [analyticsResolutionTimes, setAnalyticsResolutionTimes] = useState<any[]>([]);
+  const [analyticsHotspots, setAnalyticsHotspots] = useState<any[]>([]);
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+
 
   const showToast = (title: string, message: string, type: 'info' | 'success' | 'warning' = 'info') => {
     setToastMessage({ title, message, type });
@@ -99,6 +144,48 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   };
 
+  const login = async (email: string, password: string): Promise<boolean> => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        localStorage.setItem("cg_token", data.access_token);
+        
+        const activeUserRole = data.user.role.toLowerCase() as Role;
+        const mappedUser: User = {
+          id: String(data.user.id),
+          name: data.user.name,
+          email: data.user.email,
+          role: activeUserRole,
+          status: data.user.status,
+          verifiedAt: data.user.verified_at,
+          verifiedById: data.user.verified_by_id ? String(data.user.verified_by_id) : undefined,
+          verificationReason: data.user.verification_reason,
+          avatar: activeUserRole === 'admin' 
+            ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=200&q=80'
+            : activeUserRole === 'staff'
+              ? 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80'
+              : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'
+        };
+        
+        setCurrentUserState(mappedUser);
+        showToast(`Logged In`, `Authenticated as ${mappedUser.name} (${activeUserRole.toUpperCase()})`, 'success');
+        setActiveTab('dashboard');
+        await refreshData();
+        return true;
+      } else {
+        return false;
+      }
+    } catch (e) {
+      console.error("Login request failed", e);
+      return false;
+    }
+  };
+
   // Switch role by logging in with the seeded accounts
   const switchRole = async (role: Role) => {
     let email = "alex.rivera@campusguardian.com";
@@ -111,52 +198,66 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       email = "elec.staff@campusguardian.com";
       password = "StaffPassword123";
     } else if (role === 'teacher') {
-      // Just fallback to student or register one
       email = "alex.rivera@campusguardian.com";
       password = "StudentPassword123";
     }
 
-    try {
-      const res = await fetch(`${API_BASE}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        localStorage.setItem("cg_token", data.access_token);
-        
-        const mappedUser: User = {
-          id: String(data.user.id),
-          name: data.user.name,
-          email: data.user.email,
-          role: data.user.role.toLowerCase() as Role,
-          avatar: role === 'admin' 
-            ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=200&q=80'
-            : role === 'staff'
-              ? 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80'
-              : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'
-        };
-        
-        setCurrentUserState(mappedUser);
-        showToast(`Logged In`, `Authenticated as ${mappedUser.name} (${role.toUpperCase()})`, 'success');
-        setActiveTab('dashboard');
-        refreshData();
-      }
-    } catch (e) {
-      console.error(e);
-      showToast("Auth Error", "Failed to login on backend.", "warning");
+    const success = await login(email, password);
+    if (!success) {
+      // Fallback local mock user data if backend offline
+      const mockUser: User = {
+        id: role === 'admin' ? 'usr-admin-1' : role === 'staff' ? 'usr-staff-1' : 'usr-student-1',
+        name: role === 'admin' ? 'Administrator' : role === 'staff' ? 'Maintenance Staff' : 'Alex Rivera',
+        email: email,
+        role: role,
+        avatar: role === 'admin' 
+          ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=200&q=80'
+          : role === 'staff'
+            ? 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80'
+            : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'
+      };
+      setCurrentUserState(mockUser);
+      localStorage.setItem("cg_token", "mock_dummy_token");
+      showToast(`Mock Logged In`, `Authenticated as ${mockUser.name} (${role.toUpperCase()})`, 'success');
+      setActiveTab('dashboard');
     }
   };
 
   const setCurrentUser = (user: User) => {
     setCurrentUserState(user);
+    refreshData();
   };
 
   const refreshData = async () => {
     try {
+      let activeUserRole: Role = currentUser.role;
+      
+      // Fetch Currently Authenticated User Info first
+      const meRes = await fetch(`${API_BASE}/auth/me`, { headers: getHeaders() });
+      if (meRes.ok) {
+        const meData = await meRes.json();
+        activeUserRole = meData.role.toLowerCase() as Role;
+        const mappedUser: User = {
+          id: String(meData.id),
+          name: meData.name,
+          email: meData.email,
+          role: activeUserRole,
+          status: meData.status,
+          verifiedAt: meData.verified_at,
+          verifiedById: meData.verified_by_id ? String(meData.verified_by_id) : undefined,
+          verificationReason: meData.verification_reason,
+          avatar: meData.role === 'ADMIN' 
+            ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=200&q=80'
+            : meData.role === 'STAFF'
+              ? 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80'
+              : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'
+        };
+        setCurrentUserState(mappedUser);
+      }
+
       // Fetch Buildings
       const bldRes = await fetch(`${API_BASE}/buildings/`, { headers: getHeaders() });
+
       if (bldRes.ok) {
         const bldData = await bldRes.json();
         const mappedBuildings: Building[] = bldData.map((b: any) => ({
@@ -178,7 +279,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           id: String(u.id),
           name: u.name,
           email: u.email,
-          role: u.role.toLowerCase() as Role
+          role: u.role.toLowerCase() as Role,
+          status: u.status,
+          verifiedAt: u.verified_at,
+          verifiedById: u.verified_by_id ? String(u.verified_by_id) : undefined,
+          verificationReason: u.verification_reason,
+          avatar: u.role === 'ADMIN' 
+            ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=200&q=80'
+            : u.role === 'STAFF'
+              ? 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80'
+              : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'
         }));
         setUsers(mappedUsers);
       }
@@ -283,6 +393,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }));
         setNotifications(mappedNotifs);
       }
+
+      // Fetch Analytics datasets
+      if (activeUserRole === 'admin' || activeUserRole === 'staff') {
+        try {
+          const overviewRes = await fetch(`${API_BASE}/analytics/overview`, { headers: getHeaders() });
+          if (overviewRes.ok) setAnalyticsOverview(await overviewRes.json());
+
+          const deptRes = await fetch(`${API_BASE}/analytics/complaints-by-department`, { headers: getHeaders() });
+          if (deptRes.ok) setAnalyticsByDept(await deptRes.json());
+
+          const buildingRes = await fetch(`${API_BASE}/analytics/complaints-by-building`, { headers: getHeaders() });
+          if (buildingRes.ok) setAnalyticsByBuilding(await buildingRes.json());
+
+          const priorityRes = await fetch(`${API_BASE}/analytics/complaints-by-priority`, { headers: getHeaders() });
+          if (priorityRes.ok) setAnalyticsByPriority(await priorityRes.json());
+
+          const trendsRes = await fetch(`${API_BASE}/analytics/complaint-trends`, { headers: getHeaders() });
+          if (trendsRes.ok) setAnalyticsTrends(await trendsRes.json());
+
+          const resTimeRes = await fetch(`${API_BASE}/analytics/resolution-time`, { headers: getHeaders() });
+          if (resTimeRes.ok) setAnalyticsResolutionTimes(await resTimeRes.json());
+
+          const hotspotsRes = await fetch(`${API_BASE}/analytics/problem-hotspots`, { headers: getHeaders() });
+          if (hotspotsRes.ok) setAnalyticsHotspots(await hotspotsRes.json());
+
+          if (activeUserRole === 'admin') {
+            await fetchAuditLogs();
+          }
+        } catch (err) {
+          console.error("Failed to fetch analytics or audit logs", err);
+        }
+      }
+
+
     } catch (e) {
       console.error(e);
     }
@@ -291,14 +435,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     const initAuth = async () => {
       const token = localStorage.getItem("cg_token");
-      if (!token) {
-        await switchRole('student');
-      } else {
+      if (token) {
         await refreshData();
       }
     };
     initAuth();
-  }, [currentUser]);
+  }, []);
+
 
   const createComplaint = async (data: {
     title: string;
@@ -322,6 +465,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const bld = buildings.find(b => b.name === data.location.building);
       if (!bld) return null;
       
+      let finalImageUrl = data.imageUrl;
+      if (finalImageUrl.startsWith('data:image/')) {
+        try {
+          const response = await fetch(finalImageUrl);
+          const blob = await response.blob();
+          const formData = new FormData();
+          formData.append('file', blob, 'upload.jpg');
+
+          const token = localStorage.getItem("cg_token");
+          const uploadRes = await fetch(`${API_BASE}/upload`, {
+            method: "POST",
+            headers: token ? { "Authorization": `Bearer ${token}` } : {},
+            body: formData
+          });
+          if (uploadRes.ok) {
+            const uploadData = await uploadRes.json();
+            finalImageUrl = uploadData.url;
+          }
+        } catch (e) {
+          console.error("Failed to upload base64 image, using raw data", e);
+        }
+      }
+
       const res = await fetch(`${API_BASE}/complaints/`, {
         method: "POST",
         headers: getHeaders(),
@@ -331,8 +497,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           category: data.category,
           priority: data.priority.toUpperCase(),
           building_id: intOrZero(bld.id),
-          room_id: null, // Simple default or can resolve room ID if seeded
-          imageUrl: data.imageUrl,
+          room_id: null,
+          imageUrl: finalImageUrl,
           ai_confidence: data.confidenceScore ? data.confidenceScore / 100 : 0.95,
           ai_summary: data.aiSummary
         })
@@ -358,7 +524,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             specificSpot: data.location.specificSpot,
             coordinates: data.location.coordinates
           },
-          imageUrl: data.imageUrl,
+          imageUrl: finalImageUrl,
           reportedBy: {
             id: currentUser.id,
             name: currentUser.name,
@@ -510,6 +676,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const verifyUser = async (userId: string, status: string, reason?: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/users/${userId}/verify`, {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify({ status, reason })
+      });
+      if (res.ok) {
+        showToast('User Status Updated', `Verification status changed to ${status}`, 'success');
+        refreshData();
+      } else {
+        const errorData = await res.json();
+        showToast('Verification Failed', errorData.detail || 'Could not update user.', 'warning');
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const updateUserRole = async (userId: string, role: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/users/${userId}/role`, {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify({ role: role.toUpperCase() })
+      });
+      if (res.ok) {
+        showToast('Role Updated', `User role changed to ${role}`, 'success');
+        refreshData();
+      } else {
+        const errorData = await res.json();
+        showToast('Role Update Failed', errorData.detail || 'Could not update user role.', 'warning');
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const fetchAuditLogs = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/users/audit-logs`, { headers: getHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        setAuditLogs(data);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const resetToDemoData = () => {
     refreshData();
   };
@@ -539,13 +755,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         resetToDemoData,
         toastMessage,
         clearToast,
-        showToast
+        showToast,
+        login,
+        
+        // Analytics & Auditing states
+        analyticsOverview,
+        analyticsByDept,
+        analyticsByBuilding,
+        analyticsByPriority,
+        analyticsTrends,
+        analyticsResolutionTimes,
+        analyticsHotspots,
+        auditLogs,
+        verifyUser,
+        updateUserRole,
+        fetchAuditLogs
       }}
     >
       {children}
     </AppContext.Provider>
   );
 };
+
 
 export const useApp = () => {
   const context = useContext(AppContext);

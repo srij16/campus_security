@@ -33,12 +33,23 @@ class AuthService:
 
     @staticmethod
     def authenticate_user(db: Session, email: str, password: str) -> User:
+        from app.utils.enums import UserStatus
         user = db.query(User).filter(User.email == email).first()
         if not user or not verify_password(password, user.password_hash):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Incorrect email or password",
                 headers={"WWW-Authenticate": "Bearer"},
+            )
+        if user.status == UserStatus.SUSPENDED:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your account has been suspended. Please contact the administrator."
+            )
+        if user.status == UserStatus.REJECTED:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your registration has been rejected."
             )
         return user
 
@@ -55,6 +66,7 @@ class AuthService:
 
     @staticmethod
     def refresh_access_token(db: Session, refresh_token: str) -> Token:
+        from app.utils.enums import UserStatus
         try:
             payload = jwt.decode(refresh_token, settings.JWT_SECRET_KEY, algorithms=[ALGORITHM])
             user_id: str = payload.get("sub")
@@ -75,5 +87,10 @@ class AuthService:
             raise HTTPException(status_code=404, detail="User not found")
         if not user.is_active:
             raise HTTPException(status_code=400, detail="Inactive user")
+        if user.status == UserStatus.SUSPENDED:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Suspended user")
+        if user.status == UserStatus.REJECTED:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Rejected user")
 
         return AuthService.get_tokens_for_user(user)
+

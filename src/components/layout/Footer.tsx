@@ -3,7 +3,12 @@ import { useApp } from '../../context/AppContext';
 import { ShieldCheck, Sparkles, Phone, Mail } from 'lucide-react';
 
 export const Footer: React.FC = () => {
-  const { setActiveTab, switchRole } = useApp();
+  const { setActiveTab, switchRole, currentUser } = useApp();
+
+  // Exclude footer entirely for PWA users
+  if (currentUser && (currentUser.role === 'student' || currentUser.role === 'teacher' || currentUser.role === 'staff')) {
+    return null;
+  }
 
   return (
     <footer className="border-t border-slate-800/80 bg-[#04060d] text-slate-400 text-xs mt-20">

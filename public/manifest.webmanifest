@@ -1,0 +1,25 @@
+{
+  "name": "Campus Guardian",
+  "short_name": "Campus Guardian",
+  "description": "AI-powered campus issue reporting and maintenance tracking",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#080a10",
+  "background_color": "#080a10",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

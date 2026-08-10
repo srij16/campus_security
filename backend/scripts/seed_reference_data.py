@@ -11,7 +11,7 @@ from app.models.department import Department
 from app.models.building import Building
 from app.models.room import Room
 from app.models.user import User
-from app.utils.enums import UserRole
+from app.utils.enums import UserRole, UserStatus
 from app.core.security import get_password_hash
 
 def seed_data():
@@ -145,10 +145,12 @@ def seed_data():
                     password_hash=get_password_hash(usr["password"]),
                     role=usr["role"],
                     department_id=dept_id,
-                    is_active=True
+                    is_active=True,
+                    status=UserStatus.VERIFIED
                 )
                 db.add(db_usr)
                 db.commit()
+
 
         print("Database seeded successfully with Departments, Buildings, Rooms, and default accounts.")
     except Exception as e:

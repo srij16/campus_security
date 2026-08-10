@@ -2,7 +2,7 @@ import datetime
 from sqlalchemy import Column, Integer, String, Enum, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from app.database.session import Base
-from app.utils.enums import UserRole
+from app.utils.enums import UserRole, UserStatus
 
 class User(Base):
     __tablename__ = "users"
@@ -14,6 +14,10 @@ class User(Base):
     role = Column(Enum(UserRole), nullable=False)
     department_id = Column(Integer, ForeignKey("departments.id", ondelete="SET NULL"), nullable=True)
     is_active = Column(Boolean, default=True)
+    status = Column(Enum(UserStatus), nullable=False, default=UserStatus.PENDING)
+    verified_at = Column(DateTime, nullable=True)
+    verified_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    verification_reason = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
@@ -22,3 +26,5 @@ class User(Base):
     complaints_assigned = relationship("Complaint", back_populates="assigned_staff", foreign_keys="[Complaint.assigned_staff_id]")
     comments = relationship("Comment", back_populates="user")
     notifications = relationship("Notification", back_populates="user")
+    
+    verified_by = relationship("User", remote_side=[id], backref="verified_users")

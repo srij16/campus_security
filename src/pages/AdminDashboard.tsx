@@ -38,8 +38,27 @@ export const AdminDashboard: React.FC = () => {
     setActiveTab, 
     assignStaff, 
     updateComplaintStatus,
-    showToast 
+    showToast,
+    
+    analyticsOverview,
+    analyticsByDept,
+    analyticsByBuilding,
+    analyticsByPriority,
+    analyticsTrends,
+    analyticsResolutionTimes,
+    analyticsHotspots,
+    auditLogs,
+    verifyUser,
+    updateUserRole
   } = useApp();
+
+  // Dashboard Sub-Tabs: analytics, users, audit
+  const [dashboardTab, setDashboardTab] = useState<string>('analytics');
+
+
+  // User Verification Actions State
+  const [rejectingUserId, setRejectingUserId] = useState<string | null>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
 
   // Filters State
   const [searchQuery, setSearchQuery] = useState('');
@@ -53,11 +72,13 @@ export const AdminDashboard: React.FC = () => {
   const [assigningComplaintId, setAssigningComplaintId] = useState<string | null>(null);
   const [selectedStaffId, setSelectedStaffId] = useState<string>('');
 
-  // 1. Calculate KPI Metrics matching PDF page 5
-  const openComplaints = complaints.filter(c => c.status !== 'Resolved').length;
-  const resolvedComplaints = complaints.filter(c => c.status === 'Resolved').length;
-  const criticalIssues = complaints.filter(c => c.priority === 'Critical' && c.status !== 'Resolved').length;
-  const avgResolutionTime = '3.4 hrs';
+  // 1. Calculate KPI Metrics from backend overview or fall back to client calculations
+  const openComplaints = analyticsOverview?.open_complaints ?? complaints.filter(c => c.status !== 'Resolved').length;
+  const resolvedComplaints = analyticsOverview?.resolved_complaints ?? complaints.filter(c => c.status === 'Resolved').length;
+  const criticalIssues = analyticsOverview?.critical_complaints ?? complaints.filter(c => c.priority === 'Critical' && c.status !== 'Resolved').length;
+  const avgResolutionTime = analyticsOverview?.average_resolution_time_hours != null
+    ? `${analyticsOverview.average_resolution_time_hours.toFixed(1)} hrs`
+    : '3.4 hrs';
 
   // 2. Prepare Recharts Data
   // (a) Complaints by Department
@@ -74,10 +95,13 @@ export const AdminDashboard: React.FC = () => {
       deptCounts[c.department]++;
     }
   });
-  const deptChartData = Object.keys(deptCounts).map(dept => ({
-    name: dept,
-    count: deptCounts[dept]
-  }));
+
+  const deptChartData = analyticsByDept && analyticsByDept.length > 0
+    ? analyticsByDept.map(item => ({ name: item.name, count: item.count }))
+    : Object.keys(deptCounts).map(dept => ({
+        name: dept,
+        count: deptCounts[dept]
+      }));
 
   // (b) Complaints by Building
   const buildingCounts: Record<string, number> = {};
@@ -87,30 +111,47 @@ export const AdminDashboard: React.FC = () => {
     const bName = matchedBld ? matchedBld.code : 'Other';
     buildingCounts[bName] = (buildingCounts[bName] || 0) + 1;
   });
-  const buildingChartData = Object.keys(buildingCounts).map(b => ({
-    building: b,
-    count: buildingCounts[b]
-  }));
+
+  const buildingChartData = analyticsByBuilding && analyticsByBuilding.length > 0
+    ? analyticsByBuilding.map(item => ({ building: item.name.substring(0, 3).toUpperCase(), count: item.count }))
+    : Object.keys(buildingCounts).map(b => ({
+        building: b,
+        count: buildingCounts[b]
+      }));
 
   // (c) Complaints by Priority
-  const priorityData = [
-    { name: 'Critical', value: complaints.filter(c => c.priority === 'Critical').length, color: '#f43f5e' },
-    { name: 'High', value: complaints.filter(c => c.priority === 'High').length, color: '#f97316' },
-    { name: 'Medium', value: complaints.filter(c => c.priority === 'Medium').length, color: '#f59e0b' },
-    { name: 'Low', value: complaints.filter(c => c.priority === 'Low').length, color: '#38bdf8' },
-  ];
+  const priorityData = analyticsByPriority && analyticsByPriority.length > 0
+    ? analyticsByPriority.map(item => {
+        const colors: Record<string, string> = {
+          'CRITICAL': '#f43f5e',
+          'HIGH': '#f97316',
+          'MEDIUM': '#f59e0b',
+          'LOW': '#38bdf8'
+        };
+        const nameFormatted = item.name.charAt(0) + item.name.slice(1).toLowerCase();
+        return { name: nameFormatted, value: item.count, color: colors[item.name] || '#38bdf8' };
+      })
+    : [
+        { name: 'Critical', value: complaints.filter(c => c.priority === 'Critical').length, color: '#f43f5e' },
+        { name: 'High', value: complaints.filter(c => c.priority === 'High').length, color: '#f97316' },
+        { name: 'Medium', value: complaints.filter(c => c.priority === 'Medium').length, color: '#f59e0b' },
+        { name: 'Low', value: complaints.filter(c => c.priority === 'Low').length, color: '#38bdf8' },
+      ];
 
   // (d) Monthly / Weekly Trend Data
-  const trendData = [
-    { month: 'Apr', Reported: 12, Resolved: 11 },
-    { month: 'May', Reported: 19, Resolved: 16 },
-    { month: 'Jun', Reported: 15, Resolved: 14 },
-    { month: 'Jul', Reported: 28, Resolved: 25 },
-    { month: 'Aug (Current)', Reported: complaints.length + 8, Resolved: resolvedComplaints + 6 },
-  ];
+  const trendChartData = analyticsTrends && analyticsTrends.length > 0
+    ? analyticsTrends.map(item => ({ month: item.date, Count: item.count }))
+    : [
+        { month: 'Apr', Count: 12 },
+        { month: 'May', Count: 19 },
+        { month: 'Jun', Count: 15 },
+        { month: 'Jul', Count: 28 },
+        { month: 'Aug (Current)', Count: complaints.length },
+      ];
 
   // Colors for Department Chart
   const DEPT_COLORS = ['#38bdf8', '#818cf8', '#34d399', '#f472b6', '#fbbf24', '#a78bfa'];
+
 
   // 3. Filter Table Data
   const filteredComplaints = complaints.filter(c => {
@@ -197,6 +238,44 @@ export const AdminDashboard: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Sub-navigation Tabs */}
+      <div className="flex border-b border-slate-800 gap-2 overflow-x-auto pb-1">
+        <button
+          onClick={() => setDashboardTab('analytics')}
+          className={`px-5 py-3 border-b-2 text-sm font-semibold transition-all whitespace-nowrap ${
+            dashboardTab === 'analytics' 
+              ? 'border-cyan-400 text-cyan-400 font-bold' 
+              : 'border-transparent text-slate-400 hover:text-white'
+          }`}
+        >
+          Analytics & Infrastructure
+        </button>
+        <button
+          onClick={() => setDashboardTab('users')}
+          className={`px-5 py-3 border-b-2 text-sm font-semibold transition-all whitespace-nowrap ${
+            dashboardTab === 'users' 
+              ? 'border-cyan-400 text-cyan-400 font-bold' 
+              : 'border-transparent text-slate-400 hover:text-white'
+          }`}
+        >
+          User Account Approvals
+        </button>
+        <button
+          onClick={() => setDashboardTab('audit')}
+          className={`px-5 py-3 border-b-2 text-sm font-semibold transition-all whitespace-nowrap ${
+            dashboardTab === 'audit' 
+              ? 'border-cyan-400 text-cyan-400 font-bold' 
+              : 'border-transparent text-slate-400 hover:text-white'
+          }`}
+        >
+          Security Audit Logs
+        </button>
+      </div>
+
+      {dashboardTab === 'analytics' && (
+        <>
+
 
       {/* 1. TOP CARDS matching PDF page 5: Open Complaints, Resolved, Critical Issues, Average Resolution Time */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -317,26 +396,22 @@ export const AdminDashboard: React.FC = () => {
 
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={trendData}>
+              <AreaChart data={trendChartData}>
                 <defs>
                   <linearGradient id="colorReported" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.4}/>
                     <stop offset="95%" stopColor="#38bdf8" stopOpacity={0}/>
                   </linearGradient>
-                  <linearGradient id="colorResolved" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.4}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                  </linearGradient>
                 </defs>
                 <XAxis dataKey="month" stroke="#64748b" fontSize={11} />
                 <YAxis stroke="#64748b" fontSize={11} />
                 <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '0.75rem' }} />
-                <Area type="monotone" dataKey="Reported" stroke="#38bdf8" strokeWidth={2} fillOpacity={1} fill="url(#colorReported)" />
-                <Area type="monotone" dataKey="Resolved" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorResolved)" />
+                <Area type="monotone" dataKey="Count" stroke="#38bdf8" strokeWidth={2} fillOpacity={1} fill="url(#colorReported)" />
                 <Legend formatter={(val) => <span className="text-xs text-slate-300 font-medium">{val}</span>} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
+
         </div>
 
         {/* Chart 4: Complaints by Building */}
@@ -626,6 +701,193 @@ export const AdminDashboard: React.FC = () => {
           </div>
         </div>
       )}
+        </>
+      )}
+
+      {/* 5. USER ACCOUNT APPROVALS TAB */}
+      {dashboardTab === 'users' && (
+        <div className="glass-panel p-6 rounded-3xl border border-slate-800 space-y-6">
+          <div>
+            <h3 className="text-lg font-bold text-white">User Verification & Role Registry</h3>
+            <p className="text-xs text-slate-400">Review pending student and teacher profiles, approve registration access, or update roles.</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-slate-800 text-slate-400 uppercase tracking-wider font-semibold text-[11px] bg-slate-900/50">
+                  <th className="py-3 px-4">User</th>
+                  <th className="py-3 px-4">Email</th>
+                  <th className="py-3 px-4">Current Role</th>
+                  <th className="py-3 px-4">Status</th>
+                  <th className="py-3 px-4">Verification Details</th>
+                  <th className="py-3 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60 text-slate-300">
+                {users.map(u => (
+                  <tr key={u.id} className="hover:bg-slate-800/20 transition-colors">
+                    <td className="py-3.5 px-4 font-semibold text-white">{u.name}</td>
+                    <td className="py-3.5 px-4">{u.email}</td>
+                    <td className="py-3.5 px-4">
+                      <select
+                        value={u.role}
+                        onChange={(e) => updateUserRole(u.id, e.target.value)}
+                        className="bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-white"
+                      >
+                        <option value="student">Student</option>
+                        <option value="teacher">Teacher</option>
+                        <option value="staff">Staff</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        u.status === 'VERIFIED' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' :
+                        u.status === 'PENDING' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30' :
+                        u.status === 'REJECTED' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30' :
+                        'bg-slate-500/10 text-slate-400 border border-slate-500/30'
+                      }`}>
+                        {u.status || 'PENDING'}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4 text-[11px] text-slate-400">
+                      {u.verifiedAt ? (
+                        <div>
+                          <div>Reason: {u.verificationReason || 'N/A'}</div>
+                          <div className="text-[10px]">Verified: {new Date(u.verifiedAt).toLocaleDateString()}</div>
+                        </div>
+                      ) : (
+                        'Awaiting verification'
+                      )}
+                    </td>
+                    <td className="py-3.5 px-4 text-right space-x-2">
+                      {u.status !== 'VERIFIED' && (
+                        <button
+                          onClick={() => verifyUser(u.id, 'VERIFIED', 'Approved by administrator')}
+                          className="px-2.5 py-1 rounded bg-emerald-500 text-black font-bold text-[11px] hover:bg-emerald-400 transition-colors"
+                        >
+                          Approve
+                        </button>
+                      )}
+                      {u.status === 'PENDING' && (
+                        <button
+                          onClick={() => {
+                            setRejectingUserId(u.id);
+                            setRejectionReason('');
+                          }}
+                          className="px-2.5 py-1 rounded bg-rose-500/25 border border-rose-500/50 text-rose-300 font-semibold text-[11px] hover:bg-rose-500 hover:text-white transition-colors"
+                        >
+                          Reject
+                        </button>
+                      )}
+                      {u.status === 'VERIFIED' && (
+                        <button
+                          onClick={() => verifyUser(u.id, 'SUSPENDED', 'Suspended by admin action')}
+                          className="px-2.5 py-1 rounded bg-amber-500/10 border border-amber-500/30 text-amber-300 font-semibold text-[11px] hover:bg-amber-500 hover:text-black transition-colors"
+                        >
+                          Suspend
+                        </button>
+                      )}
+                      {u.status === 'SUSPENDED' && (
+                        <button
+                          onClick={() => verifyUser(u.id, 'VERIFIED', 'Re-activated by admin')}
+                          className="px-2.5 py-1 rounded bg-cyan-500 text-black font-bold text-[11px] hover:bg-cyan-400 transition-colors"
+                        >
+                          Reactivate
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Rejection Reason Modal */}
+          {rejectingUserId && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+              <div className="w-full max-w-md bg-[#0d1627] border border-slate-700 rounded-2xl p-6 shadow-2xl space-y-4">
+                <h3 className="text-base font-bold text-white">Provide Rejection Reason</h3>
+                <textarea
+                  placeholder="Reason for rejecting this account..."
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400 min-h-[80px]"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      verifyUser(rejectingUserId, 'REJECTED', rejectionReason);
+                      setRejectingUserId(null);
+                    }}
+                    className="flex-1 py-2 rounded-xl bg-rose-500 text-white text-xs font-bold hover:bg-rose-400"
+                  >
+                    Confirm Reject
+                  </button>
+                  <button
+                    onClick={() => setRejectingUserId(null)}
+                    className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 6. SECURITY AUDIT LOGS TAB */}
+      {dashboardTab === 'audit' && (
+        <div className="glass-panel p-6 rounded-3xl border border-slate-800 space-y-6">
+          <div>
+            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              <ShieldAlert className="w-5 h-5 text-rose-400" />
+              <span>System Security & Action Logs</span>
+            </h3>
+            <p className="text-xs text-slate-400">Chronological history of administrative actions, user verifications, and roles changes.</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-slate-800 text-slate-400 uppercase tracking-wider font-semibold text-[11px] bg-slate-900/50">
+                  <th className="py-3 px-4">Timestamp</th>
+                  <th className="py-3 px-4">Actor</th>
+                  <th className="py-3 px-4">Action</th>
+                  <th className="py-3 px-4">Target Entity</th>
+                  <th className="py-3 px-4">Metadata</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60 text-slate-300 font-mono">
+                {auditLogs.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="text-center py-10 text-slate-500 font-sans">
+                      No security audit logs recorded yet.
+                    </td>
+                  </tr>
+                ) : (
+                  auditLogs.map((log: any) => (
+                    <tr key={log.id} className="hover:bg-slate-800/20 transition-colors">
+                      <td className="py-3 px-4 text-slate-400 whitespace-nowrap">
+                        {new Date(log.created_at).toLocaleString()}
+                      </td>
+                      <td className="py-3 px-4 text-white font-sans">{log.actor_name}</td>
+                      <td className="py-3 px-4 text-cyan-400 font-bold">{log.action}</td>
+                      <td className="py-3 px-4 text-slate-300">
+                        {log.entity_type} (ID: {log.entity_id})
+                      </td>
+                      <td className="py-3 px-4 text-[11px] text-slate-400 font-sans font-sans">
+                        {log.metadata ? JSON.stringify(log.metadata) : '-'}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+

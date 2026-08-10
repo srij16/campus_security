@@ -1,7 +1,7 @@
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 import datetime
-from app.utils.enums import UserRole
+from app.utils.enums import UserRole, UserStatus
 
 class UserBase(BaseModel):
     name: str
@@ -22,8 +22,20 @@ class UserUpdate(BaseModel):
 class UserResponse(UserBase):
     id: int
     is_active: bool
+    status: UserStatus
+    verified_at: Optional[datetime.datetime] = None
+    verified_by_id: Optional[int] = None
+    verification_reason: Optional[str] = None
     created_at: datetime.datetime
     updated_at: datetime.datetime
 
     class Config:
         from_attributes = True
+
+class UserVerifyRequest(BaseModel):
+    status: UserStatus
+    reason: Optional[str] = None
+
+class UserRoleUpdateRequest(BaseModel):
+    role: UserRole
+

@@ -21,7 +21,12 @@ export interface User {
   department?: Department;
   identifier?: string; // Student ID or Employee ID
   phone?: string;
+  status?: string;
+  verifiedAt?: string;
+  verifiedById?: string;
+  verificationReason?: string;
 }
+
 
 export interface TimelineEvent {
   id: string;

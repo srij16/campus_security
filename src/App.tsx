@@ -29,6 +29,16 @@ const AppContent: React.FC = () => {
   };
 
   const renderActivePage = () => {
+    // If the active tab is landing, allow rendering it even for unauthenticated guests
+    if (activeTab === 'landing') {
+      return <LandingPage />;
+    }
+
+    // If not authenticated (no ID), force the LoginPage render regardless of requested tab
+    if (!currentUser || !currentUser.id) {
+      return <LoginPage />;
+    }
+
     switch (activeTab) {
       case 'landing':
         return <LandingPage />;
@@ -46,13 +56,16 @@ const AppContent: React.FC = () => {
     }
   };
 
+  const isAuthenticated = currentUser && currentUser.id;
+  const isPWAUser = currentUser && (currentUser.role === 'student' || currentUser.role === 'teacher' || currentUser.role === 'staff');
+
   return (
-    <div className="min-h-screen flex flex-col bg-[#080a10] text-slate-100 selection:bg-cyan-500 selection:text-black">
-      <Navbar />
-      <main className="flex-1 w-full">
+    <div className="min-h-screen flex flex-col bg-[#080a10] text-slate-100 selection:bg-cyan-500 selection:text-black relative">
+      {isAuthenticated && <Navbar />}
+      <main className="flex-1 w-full overflow-y-auto">
         {renderActivePage()}
       </main>
-      <Footer />
+      {isAuthenticated && !isPWAUser && <Footer />}
     </div>
   );
 };

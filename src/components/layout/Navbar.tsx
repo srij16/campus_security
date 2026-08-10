@@ -68,7 +68,9 @@ export const Navbar: React.FC = () => {
 
   return (
     <>
-      <header className="sticky top-0 z-40 w-full glass-panel border-b border-slate-800/80 transition-all">
+      <header className={`sticky top-0 z-40 w-full glass-panel border-b border-slate-800/80 transition-all ${
+        currentUser.role !== 'admin' ? 'hidden md:block' : ''
+      }`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 sm:h-18">
             {/* Logo & Brand */}
@@ -106,7 +108,6 @@ export const Navbar: React.FC = () => {
               />
 
               {[
-                { id: 'landing', label: 'Home', icon: Home },
                 { id: 'dashboard', label: `${currentUser.role} Dashboard`, icon: LayoutDashboard },
                 { id: 'map', label: 'Campus Map', icon: MapPin },
                 { id: 'analytics', label: 'Analytics', icon: BarChart3 }
@@ -156,26 +157,35 @@ export const Navbar: React.FC = () => {
               </button>
 
               {/* User Persona & Role Switcher */}
-              <button
-                onClick={() => setIsRoleModalOpen(true)}
-                className="flex items-center gap-2 p-1.5 pr-2.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-cyan-500/40 transition-all group"
-                title="Click to Switch Persona"
-              >
-                <img
-                  src={currentUser.avatar}
-                  alt={currentUser.name}
-                  className="w-7 h-7 rounded-lg object-cover border border-slate-700"
-                />
-                <div className="text-left hidden lg:block">
-                  <div className="text-xs font-semibold text-white leading-tight truncate max-w-[100px]">
-                    {currentUser.name.split(' ')[0]}
+              {currentUser && currentUser.id ? (
+                <button
+                  onClick={() => setIsRoleModalOpen(true)}
+                  className="flex items-center gap-2 p-1.5 pr-2.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-cyan-500/40 transition-all group"
+                  title="Click to Switch Persona"
+                >
+                  <img
+                    src={currentUser.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'}
+                    alt={currentUser.name}
+                    className="w-7 h-7 rounded-lg object-cover border border-slate-700"
+                  />
+                  <div className="text-left hidden lg:block">
+                    <div className="text-xs font-semibold text-white leading-tight truncate max-w-[100px]">
+                      {currentUser.name ? currentUser.name.split(' ')[0] : 'Guest'}
+                    </div>
+                    <span className={`inline-block px-1.5 py-0.2 text-[9px] font-bold uppercase rounded border ${getRoleBadgeStyle(currentUser.role)}`}>
+                      {currentUser.role}
+                    </span>
                   </div>
-                  <span className={`inline-block px-1.5 py-0.2 text-[9px] font-bold uppercase rounded border ${getRoleBadgeStyle(currentUser.role)}`}>
-                    {currentUser.role}
-                  </span>
-                </div>
-                <RefreshCw className="w-3.5 h-3.5 text-slate-400 group-hover:text-cyan-400 group-hover:rotate-180 transition-all" />
-              </button>
+                  <RefreshCw className="w-3.5 h-3.5 text-slate-400 group-hover:text-cyan-400 group-hover:rotate-180 transition-all" />
+                </button>
+              ) : (
+                <button
+                  onClick={() => setActiveTab('login')}
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-cyan-500 text-black"
+                >
+                  Sign In
+                </button>
+              )}
 
               {/* Mobile Menu Toggle */}
               <button
@@ -191,12 +201,7 @@ export const Navbar: React.FC = () => {
         {/* Mobile Navigation Drawer */}
         {isMobileMenuOpen && (
           <div className="md:hidden px-4 pt-2 pb-4 border-t border-slate-800 bg-[#0b1120] space-y-1.5">
-            <button
-              onClick={() => { setActiveTab('landing'); setIsMobileMenuOpen(false); }}
-              className="w-full text-left px-3 py-2 rounded-lg text-sm text-slate-300 hover:bg-slate-800"
-            >
-              Home
-            </button>
+
             <button
               onClick={() => { setActiveTab('dashboard'); setIsMobileMenuOpen(false); }}
               className="w-full text-left px-3 py-2 rounded-lg text-sm text-slate-300 hover:bg-slate-800 capitalize"
@@ -247,6 +252,7 @@ export const Navbar: React.FC = () => {
         isOpen={isNotifDrawerOpen}
         onClose={() => setIsNotifDrawerOpen(false)}
       />
+
     </>
   );
 };

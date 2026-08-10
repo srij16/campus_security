@@ -14,10 +14,10 @@ import {
 } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
-  const { switchRole, users, setCurrentUser, setActiveTab } = useApp();
+  const { switchRole, login, setActiveTab } = useApp();
   const [selectedRole, setSelectedRole] = useState<Role>('student');
-  const [emailInput, setEmailInput] = useState('alex.rivera@campus.edu');
-  const [passwordInput, setPasswordInput] = useState('••••••••••••');
+  const [emailInput, setEmailInput] = useState('alex.rivera@campusguardian.com');
+  const [passwordInput, setPasswordInput] = useState('StudentPassword123');
 
   const roleOptions: {
     role: Role;
@@ -38,7 +38,7 @@ export const LoginPage: React.FC = () => {
       color: 'text-cyan-400',
       borderColor: 'border-cyan-500/40',
       bgHover: 'hover:border-cyan-400 hover:bg-cyan-950/20',
-      defaultUserEmail: 'alex.rivera@campus.edu',
+      defaultUserEmail: 'alex.rivera@campusguardian.com',
       features: ['Upload issue photos', 'Live ticket tracker', 'Duplicate alert support']
     },
     {
@@ -49,7 +49,7 @@ export const LoginPage: React.FC = () => {
       color: 'text-emerald-400',
       borderColor: 'border-emerald-500/40',
       bgHover: 'hover:border-emerald-400 hover:bg-emerald-950/20',
-      defaultUserEmail: 'd.sharma@campus.edu',
+      defaultUserEmail: 'alex.rivera@campusguardian.com',
       features: ['Classroom priority queue', 'Direct faculty commentary', 'Audit logs']
     },
     {
@@ -60,7 +60,7 @@ export const LoginPage: React.FC = () => {
       color: 'text-rose-400',
       borderColor: 'border-rose-500/40',
       bgHover: 'hover:border-rose-400 hover:bg-rose-950/20',
-      defaultUserEmail: 'admin.vance@campus.edu',
+      defaultUserEmail: 'admin@campusguardian.com',
       features: ['Staff dispatch console', 'Live campus analytics', 'Emergency broadcast']
     },
     {
@@ -71,7 +71,7 @@ export const LoginPage: React.FC = () => {
       color: 'text-amber-400',
       borderColor: 'border-amber-500/40',
       bgHover: 'hover:border-amber-400 hover:bg-amber-950/20',
-      defaultUserEmail: 'm.cole@maintenance.campus.edu',
+      defaultUserEmail: 'elec.staff@campusguardian.com',
       features: ['Assigned task queue', 'Before/After repair photos', 'Status transitions']
     }
   ];
@@ -79,6 +79,13 @@ export const LoginPage: React.FC = () => {
   const handleRoleCardClick = (role: Role, defaultEmail: string) => {
     setSelectedRole(role);
     setEmailInput(defaultEmail);
+    if (role === 'admin') {
+      setPasswordInput('AdminPassword123');
+    } else if (role === 'staff') {
+      setPasswordInput('StaffPassword123');
+    } else {
+      setPasswordInput('StudentPassword123');
+    }
   };
 
   const handleQuickLogin = (role: Role) => {
@@ -86,13 +93,10 @@ export const LoginPage: React.FC = () => {
     setActiveTab('dashboard');
   };
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const matched = users.find((u: any) => u.email.toLowerCase() === emailInput.toLowerCase()) || users.find((u: any) => u.role === selectedRole);
-    if (matched) {
-      setCurrentUser(matched);
-      setActiveTab('dashboard');
-    } else {
+    const success = await login(emailInput, passwordInput);
+    if (!success) {
       switchRole(selectedRole);
     }
   };
