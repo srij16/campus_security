@@ -751,13 +751,43 @@ export const AdminDashboard: React.FC = () => {
                       </span>
                     </td>
                     <td className="py-3.5 px-4 text-[11px] text-slate-400">
-                      {u.verifiedAt ? (
+                      {u.studentId || u.employeeId ? (
+                        <div className="space-y-1">
+                          {u.studentId && (
+                            <>
+                              <div><span className="font-semibold text-slate-300">Student ID:</span> {u.studentId}</div>
+                              <div><span className="font-semibold text-slate-300">Course:</span> {u.course} (Year {u.year}, Sem {u.semester})</div>
+                            </>
+                          )}
+                          {u.employeeId && (
+                            <>
+                              <div><span className="font-semibold text-slate-300">Employee ID:</span> {u.employeeId}</div>
+                              <div><span className="font-semibold text-slate-300">Designation:</span> {u.designation}</div>
+                            </>
+                          )}
+                          {u.documentUrl && (
+                            <a
+                              href={u.documentUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 mt-1 text-cyan-400 hover:underline"
+                            >
+                              View ID Document
+                            </a>
+                          )}
+                          {u.verifiedAt && (
+                            <div className="text-[10px] text-slate-500 mt-1 border-t border-slate-800 pt-1">
+                              Verified: {new Date(u.verifiedAt).toLocaleDateString()}
+                            </div>
+                          )}
+                        </div>
+                      ) : u.verifiedAt ? (
                         <div>
                           <div>Reason: {u.verificationReason || 'N/A'}</div>
                           <div className="text-[10px]">Verified: {new Date(u.verifiedAt).toLocaleDateString()}</div>
                         </div>
                       ) : (
-                        'Awaiting verification'
+                        'Awaiting verification details'
                       )}
                     </td>
                     <td className="py-3.5 px-4 text-right space-x-2">
@@ -817,6 +847,10 @@ export const AdminDashboard: React.FC = () => {
                 <div className="flex gap-2">
                   <button
                     onClick={() => {
+                      if (!rejectionReason.trim()) {
+                        showToast('Rejection Reason Required', 'Please enter a reason for rejecting this user.', 'warning');
+                        return;
+                      }
                       verifyUser(rejectingUserId, 'REJECTED', rejectionReason);
                       setRejectingUserId(null);
                     }}

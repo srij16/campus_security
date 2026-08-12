@@ -4,6 +4,7 @@ import { Navbar } from './components/layout/Navbar';
 import { Footer } from './components/layout/Footer';
 import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/LoginPage';
+import { OnboardingPage } from './pages/OnboardingPage';
 import { StudentDashboard } from './pages/StudentDashboard';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { StaffDashboard } from './pages/StaffDashboard';
@@ -37,6 +38,24 @@ const AppContent: React.FC = () => {
     // If not authenticated (no ID), force the LoginPage render regardless of requested tab
     if (!currentUser || !currentUser.id) {
       return <LoginPage />;
+    }
+
+    if (currentUser.role !== 'admin') {
+      if (currentUser.status === 'SUSPENDED') {
+        return <LoginPage />;
+      }
+
+      if (currentUser.status === 'REJECTED') {
+        return <OnboardingPage />;
+      }
+
+      if (currentUser.status === 'PENDING') {
+        return <OnboardingPage />;
+      }
+
+      if (activeTab === 'onboarding' || activeTab === 'verification-pending' || activeTab === 'verification-rejected') {
+        return <OnboardingPage />;
+      }
     }
 
     switch (activeTab) {

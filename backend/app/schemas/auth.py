@@ -18,3 +18,7 @@ class LoginRequest(BaseModel):
 
 class RefreshRequest(BaseModel):
     refresh_token: str
+
+class GoogleLoginRequest(BaseModel):
+    token: str
+

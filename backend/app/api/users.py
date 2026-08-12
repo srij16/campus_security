@@ -66,6 +66,57 @@ def get_audit_logs(db: Session = Depends(get_db), current_user: User = Depends(a
         for log in logs
     ]
 
+from app.schemas.user import UserResponse, UserVerifyRequest, UserRoleUpdateRequest, UserOnboardRequest
+from app.models.notification import Notification
+
+@router.post("/onboard", response_model=UserResponse)
+def onboard_user(
+    req: UserOnboardRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.status == UserStatus.VERIFIED:
+        raise HTTPException(status_code=400, detail="User is already verified.")
+    if current_user.status == UserStatus.SUSPENDED:
+        raise HTTPException(status_code=400, detail="Suspended user cannot onboard.")
+    if req.role == UserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="Cannot request admin role.")
+        
+    current_user.role = req.role
+    current_user.department_id = req.department_id
+    current_user.student_id = req.student_id
+    current_user.employee_id = req.employee_id
+    current_user.designation = req.designation
+    current_user.course = req.course
+    current_user.year = req.year
+    current_user.semester = req.semester
+    current_user.phone = req.phone
+    current_user.document_url = req.document_url
+    
+    current_user.status = UserStatus.PENDING
+    db.commit()
+    db.refresh(current_user)
+    
+    log_audit(
+        db,
+        actor_id=current_user.id,
+        action="USER_VERIFICATION_SUBMITTED",
+        entity_type="User",
+        entity_id=current_user.id,
+        metadata={"role_requested": req.role.value}
+    )
+    
+    notif = Notification(
+        user_id=current_user.id,
+        title="Verification Submitted",
+        message=f"Your verification request for role {req.role.value} has been submitted.",
+        is_read=False
+    )
+    db.add(notif)
+    db.commit()
+    
+    return current_user
+
 @router.post("/{user_id}/verify", response_model=UserResponse)
 def verify_user(
     user_id: int,
@@ -80,6 +131,7 @@ def verify_user(
     if req.status == UserStatus.SUSPENDED or req.status == UserStatus.REJECTED:
         check_last_admin_safety(db, user_id)
         
+    old_status = user.status
     user.status = req.status
     user.verification_reason = req.reason
     user.verified_at = datetime.datetime.utcnow()
@@ -88,15 +140,51 @@ def verify_user(
     db.commit()
     db.refresh(user)
     
+    # Map status to audit action
+    action = f"VERIFY_STATUS_{req.status.value}"
+    if req.status == UserStatus.VERIFIED:
+        action = "USER_VERIFIED"
+    elif req.status == UserStatus.REJECTED:
+        action = "USER_VERIFICATION_REJECTED"
+        if not req.reason:
+            raise HTTPException(status_code=400, detail="Rejection reason is required.")
+    elif req.status == UserStatus.SUSPENDED:
+        action = "USER_SUSPENDED"
+    elif req.status == UserStatus.PENDING and old_status == UserStatus.SUSPENDED:
+        action = "USER_REACTIVATED"
+        
     log_audit(
         db,
         actor_id=current_user.id,
-        action=f"VERIFY_STATUS_{req.status.value}",
+        action=action,
         entity_type="User",
         entity_id=user.id,
         metadata={"reason": req.reason}
     )
     
+    # Notify user
+    notif_msg = ""
+    notif_title = ""
+    if req.status == UserStatus.VERIFIED:
+        notif_title = "Verification Approved"
+        notif_msg = "Your Campus Guardian account has been verified."
+    elif req.status == UserStatus.REJECTED:
+        notif_title = "Verification Rejected"
+        notif_msg = f"Your Campus Guardian verification has been rejected. Reason: {req.reason}"
+    elif req.status == UserStatus.SUSPENDED:
+        notif_title = "Account Suspended"
+        notif_msg = f"Your account has been suspended. Reason: {req.reason}"
+        
+    if notif_title:
+        notif = Notification(
+            user_id=user.id,
+            title=notif_title,
+            message=notif_msg,
+            is_read=False
+        )
+        db.add(notif)
+        db.commit()
+        
     return user
 
 @router.post("/{user_id}/role", response_model=UserResponse)
@@ -110,7 +198,6 @@ def change_role(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
         
-    # If the user is currently an admin and is being changed to something else, check safety
     if user.role == UserRole.ADMIN and req.role != UserRole.ADMIN:
         check_last_admin_safety(db, user_id)
         
@@ -122,11 +209,12 @@ def change_role(
     log_audit(
         db,
         actor_id=current_user.id,
-        action="CHANGE_ROLE",
+        action="ROLE_CHANGED",
         entity_type="User",
         entity_id=user.id,
         metadata={"old_role": old_role.value, "new_role": req.role.value}
     )
     
     return user
+
 

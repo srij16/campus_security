@@ -25,6 +25,14 @@ export interface User {
   verifiedAt?: string;
   verifiedById?: string;
   verificationReason?: string;
+  auth_user_id?: string;
+  studentId?: string;
+  employeeId?: string;
+  designation?: string;
+  course?: string;
+  year?: number;
+  semester?: number;
+  documentUrl?: string;
 }
 
 

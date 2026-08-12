@@ -29,3 +29,67 @@ def logout(current_user: User = Depends(get_current_user)):
 @router.get("/me", response_model=UserResponse)
 def get_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+import httpx
+from fastapi import HTTPException
+from app.schemas.auth import GoogleLoginRequest
+from app.core.config import settings
+from app.utils.enums import UserRole, UserStatus
+
+@router.post("/google", response_model=Token)
+async def google_login(login_req: GoogleLoginRequest, db: Session = Depends(get_db)):
+    url = f"{settings.SUPABASE_URL}/auth/v1/user"
+    headers = {
+        "Authorization": f"Bearer {login_req.token}",
+        "apikey": settings.SUPABASE_PUBLISHABLE_KEY
+    }
+    
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.get(url, headers=headers)
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"Failed to communicate with Supabase Auth: {str(e)}"
+            )
+            
+    if resp.status_code != 200:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Supabase or Google session"
+        )
+        
+    user_info = resp.json()
+    supabase_uid = user_info.get("id")
+    email = user_info.get("email")
+    user_metadata = user_info.get("user_metadata", {})
+    name = user_metadata.get("full_name") or user_metadata.get("name") or email.split("@")[0]
+    
+    user = db.query(User).filter(User.auth_user_id == supabase_uid).first()
+    if not user:
+        user = db.query(User).filter(User.email == email).first()
+        if user:
+            user.auth_user_id = supabase_uid
+            db.commit()
+            db.refresh(user)
+        else:
+            user = User(
+                name=name,
+                email=email,
+                auth_user_id=supabase_uid,
+                role=UserRole.STUDENT,
+                status=UserStatus.PENDING,
+                is_active=True
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+            
+    if user.status == UserStatus.SUSPENDED:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account has been suspended. Please contact the administrator."
+        )
+        
+    return AuthService.get_tokens_for_user(user)
+

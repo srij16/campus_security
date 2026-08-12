@@ -10,7 +10,8 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
-    password_hash = Column(String, nullable=False)
+    password_hash = Column(String, nullable=True)
+    auth_user_id = Column(String, unique=True, index=True, nullable=True)
     role = Column(Enum(UserRole), nullable=False)
     department_id = Column(Integer, ForeignKey("departments.id", ondelete="SET NULL"), nullable=True)
     is_active = Column(Boolean, default=True)
@@ -18,6 +19,17 @@ class User(Base):
     verified_at = Column(DateTime, nullable=True)
     verified_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     verification_reason = Column(String, nullable=True)
+    
+    # Onboarding / Verification details
+    student_id = Column(String, nullable=True)
+    employee_id = Column(String, nullable=True)
+    designation = Column(String, nullable=True)
+    course = Column(String, nullable=True)
+    year = Column(Integer, nullable=True)
+    semester = Column(Integer, nullable=True)
+    phone = Column(String, nullable=True)
+    document_url = Column(String, nullable=True)
+    
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 

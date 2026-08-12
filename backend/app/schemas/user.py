@@ -26,6 +26,15 @@ class UserResponse(UserBase):
     verified_at: Optional[datetime.datetime] = None
     verified_by_id: Optional[int] = None
     verification_reason: Optional[str] = None
+    auth_user_id: Optional[str] = None
+    student_id: Optional[str] = None
+    employee_id: Optional[str] = None
+    designation: Optional[str] = None
+    course: Optional[str] = None
+    year: Optional[int] = None
+    semester: Optional[int] = None
+    phone: Optional[str] = None
+    document_url: Optional[str] = None
     created_at: datetime.datetime
     updated_at: datetime.datetime
 
@@ -38,4 +47,17 @@ class UserVerifyRequest(BaseModel):
 
 class UserRoleUpdateRequest(BaseModel):
     role: UserRole
+
+class UserOnboardRequest(BaseModel):
+    role: UserRole
+    department_id: Optional[int] = None
+    student_id: Optional[str] = None
+    employee_id: Optional[str] = None
+    designation: Optional[str] = None
+    course: Optional[str] = None
+    year: Optional[int] = None
+    semester: Optional[int] = None
+    phone: Optional[str] = None
+    document_url: Optional[str] = None
+
 

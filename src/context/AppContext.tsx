@@ -12,6 +12,7 @@ import {
   Comment
 } from '../types';
 import confetti from 'canvas-confetti';
+import { supabase } from '../services/supabase';
 
 interface AppContextType {
   currentUser: User;
@@ -60,6 +61,8 @@ interface AppContextType {
   clearToast: () => void;
   showToast: (title: string, message: string, type?: 'info' | 'success' | 'warning') => void;
   login: (email: string, password: string) => Promise<boolean>;
+  loginWithGoogle: () => Promise<void>;
+  onboardUser: (data: any) => Promise<boolean>;
   
   // Analytics & Auditing extension
   analyticsOverview: any;
@@ -169,7 +172,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=200&q=80'
             : activeUserRole === 'staff'
               ? 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80'
-              : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'
+              : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+          auth_user_id: data.user.auth_user_id,
+          studentId: data.user.student_id,
+          employeeId: data.user.employee_id,
+          designation: data.user.designation,
+          course: data.user.course,
+          year: data.user.year,
+          semester: data.user.semester,
+          documentUrl: data.user.document_url,
+          phone: data.user.phone
         };
         
         setCurrentUserState(mappedUser);
@@ -250,7 +262,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=200&q=80'
             : meData.role === 'STAFF'
               ? 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80'
-              : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'
+              : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+          auth_user_id: meData.auth_user_id,
+          studentId: meData.student_id,
+          employeeId: meData.employee_id,
+          designation: meData.designation,
+          course: meData.course,
+          year: meData.year,
+          semester: meData.semester,
+          documentUrl: meData.document_url,
+          phone: meData.phone
         };
         setCurrentUserState(mappedUser);
       }
@@ -288,7 +309,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=200&q=80'
             : u.role === 'STAFF'
               ? 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80'
-              : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'
+              : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+          auth_user_id: u.auth_user_id,
+          studentId: u.student_id,
+          employeeId: u.employee_id,
+          designation: u.designation,
+          course: u.course,
+          year: u.year,
+          semester: u.semester,
+          documentUrl: u.document_url,
+          phone: u.phone
         }));
         setUsers(mappedUsers);
       }
@@ -432,6 +462,47 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const loginWithGoogle = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin
+        }
+      });
+      if (error) {
+        showToast('Authentication Error', error.message, 'warning');
+      }
+    } catch (e: any) {
+      console.error(e);
+      showToast('Authentication Error', e.message || 'Google Auth failed', 'warning');
+    }
+  };
+
+  const onboardUser = async (data: any): Promise<boolean> => {
+    try {
+      const res = await fetch(`${API_BASE}/users/onboard`, {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify(data)
+      });
+      if (res.ok) {
+        showToast('Onboarding Submitted', 'Your verification request has been submitted.', 'success');
+        await refreshData();
+        setActiveTab('verification-pending');
+        return true;
+      } else {
+        const err = await res.json();
+        showToast('Onboarding Failed', err.detail || 'Could not submit onboarding details.', 'warning');
+        return false;
+      }
+    } catch (e) {
+      console.error(e);
+      showToast('Error', 'Network error during onboarding.', 'warning');
+      return false;
+    }
+  };
+
   useEffect(() => {
     const initAuth = async () => {
       const token = localStorage.getItem("cg_token");
@@ -440,6 +511,74 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     };
     initAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session) {
+        try {
+          const res = await fetch(`${API_BASE}/auth/google`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: session.access_token })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            localStorage.setItem("cg_token", data.access_token);
+            
+            const activeUserRole = data.user.role.toLowerCase() as Role;
+            const mappedUser: User = {
+              id: String(data.user.id),
+              name: data.user.name,
+              email: data.user.email,
+              role: activeUserRole,
+              status: data.user.status,
+              verifiedAt: data.user.verified_at,
+              verifiedById: data.user.verified_by_id ? String(data.user.verified_by_id) : undefined,
+              verificationReason: data.user.verification_reason,
+              avatar: activeUserRole === 'admin' 
+                ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=200&q=80'
+                : activeUserRole === 'staff'
+                  ? 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80'
+                  : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+              auth_user_id: data.user.auth_user_id,
+              studentId: data.user.student_id,
+              employeeId: data.user.employee_id,
+              designation: data.user.designation,
+              course: data.user.course,
+              year: data.user.year,
+              semester: data.user.semester,
+              documentUrl: data.user.document_url,
+              phone: data.user.phone
+            };
+            
+            setCurrentUserState(mappedUser);
+            
+            if (mappedUser.status === 'VERIFIED') {
+              setActiveTab('dashboard');
+              showToast(`Logged In`, `Authenticated as ${mappedUser.name} (${activeUserRole.toUpperCase()})`, 'success');
+            } else if (mappedUser.status === 'SUSPENDED') {
+              setActiveTab('login');
+              showToast(`Access Denied`, `Your account has been suspended.`, 'warning');
+            } else if (mappedUser.status === 'REJECTED') {
+              setActiveTab('verification-rejected');
+            } else if (mappedUser.status === 'PENDING') {
+              if (mappedUser.studentId || mappedUser.employeeId || mappedUser.designation) {
+                setActiveTab('verification-pending');
+              } else {
+                setActiveTab('onboarding');
+              }
+            }
+            
+            await refreshData();
+          }
+        } catch (err) {
+          console.error("Failed to authenticate with backend", err);
+        }
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
 
@@ -757,6 +896,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         clearToast,
         showToast,
         login,
+        loginWithGoogle,
+        onboardUser,
         
         // Analytics & Auditing states
         analyticsOverview,
